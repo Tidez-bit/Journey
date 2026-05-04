@@ -1,0 +1,169 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        String   @id @default(uuid())
+  email     String   @unique
+  password  String
+  name      String
+  createdAt        DateTime @default(now())
+  scannerEnabled   Boolean  @default(true)
+  maxLossType      String   @default("FIXED") // FIXED | PERCENTAGE
+  maxLossValue     Float    @default(0)
+  maxLossResetDate DateTime?
+  trades          Trade[]
+  transactions    Transaction[]
+  targets         Target[]
+  dailyTargetLogs DailyTargetLog[]
+  rules           Rule[]
+  scanners        Scanner[]
+}
+
+model Trade {
+  id          String   @id @default(uuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id])
+  
+  // Trade Timing
+  openTime    DateTime
+  exitTime    DateTime?
+  
+  // Trade Details
+  pair        String
+  direction   String   // "LONG" | "SHORT"
+  entryPrice  Float
+  slPrice     Float?
+  tpPrice     Float?
+  exitPrice   Float?
+  
+  // Result
+  pnl         Float
+  pnlPercent  Float?
+  
+  // Metadata
+  strategy    String?
+  screenshotUrl String?
+  notes       String?
+  tags        String?
+  
+  // Rule Violation
+  isRuleViolated Boolean @default(false)
+  tradeRules  TradeRule[]
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  @@index([userId])
+  @@index([userId, openTime])
+  @@index([userId, pair])
+}
+
+model Transaction {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  type      String   // DEPOSIT / WITHDRAW
+  amount    Float
+  note      String?
+  date      DateTime
+  createdAt DateTime @default(now())
+}
+
+model Target {
+  id            String   @id @default(uuid())
+  userId        String
+  user          User     @relation(fields: [userId], references: [id])
+  type          String   // GLOBAL / DAILY
+  name          String
+  startBalance  Float
+  targetBalance Float
+  dailyPercent  Float?   // untuk daily compounding
+  deadline      DateTime?
+  isActive      Boolean  @default(true)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  dailyTargetLogs DailyTargetLog[]
+}
+
+model DailyTargetLog {
+  id           String   @id @default(uuid())
+  targetId     String
+  target       Target   @relation(fields: [targetId], references: [id])
+  userId       String
+  user         User     @relation(fields: [userId], references: [id])
+  date         DateTime
+  balanceStart Float
+  targetAmount Float
+  actualPnl    Float
+  isAchieved   Boolean  @default(false)
+  createdAt    DateTime @default(now())
+
+  @@unique([userId, date])
+}
+
+model Rule {
+  id          String   @id @default(uuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id])
+  title       String
+  description String?  @db.Text
+  category    String?
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  tradeRules TradeRule[]
+}
+
+model TradeRule {
+  id        String   @id @default(uuid())
+  tradeId   String
+  trade     Trade    @relation(fields: [tradeId], references: [id], onDelete: Cascade)
+  ruleId    String
+  rule      Rule     @relation(fields: [ruleId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@unique([tradeId, ruleId])
+  @@index([tradeId])
+  @@index([ruleId])
+}
+
+model Scanner {
+  id              String   @id @default(uuid())
+  userId          String
+  user            User     @relation(fields: [userId], references: [id])
+  date            DateTime
+  pair            String   
+  timeframe       String   
+  currentPrice    Float
+  lastHigh        Float    
+  lastLow         Float    
+  pdArray         String   
+  pdPercent       Float    
+  liquidityAbove  Float?   
+  liquidityBelow  Float?   
+  liquiditySide   String?  
+  obBullish       String?  
+  obBearish       String?  
+  obSide          String?  
+  trend           String   
+  structure       String?  
+  volume          String   
+  volumeRatio     Float?   
+  bias            String   
+  confidence      Int?     
+  notes           String?  @db.Text
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  
+  @@unique([userId, date, pair, timeframe])
+  @@index([userId, date])
+  @@index([userId, pair, timeframe])
+}
