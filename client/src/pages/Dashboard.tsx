@@ -1,8 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { useDashboardStore } from '../store/dashboardStore';
 import EquityChart from '../components/EquityChart';
-import { 
-  Wallet, Activity, Target, Flame, Shield, 
+import {
+  Wallet, Activity, Target, Flame, Shield,
   Settings, TrendingUp, TrendingDown, ArrowRightLeft,
   ChevronRight
 } from 'lucide-react';
@@ -34,7 +34,7 @@ export default function Dashboard() {
     if (!stats || stats.maxLossValue <= 0) return { percent: 0, limit: 0, color: 'bg-slate-600', text: 'text-slate-400', label: 'Not Set' };
     const limit = stats.maxLossType === 'PERCENTAGE' ? (stats.currentBalance * stats.maxLossValue / 100) : stats.maxLossValue;
     if (limit <= 0) return { percent: 0, limit: 0, color: 'bg-slate-600', text: 'text-slate-400', label: 'Not Set' };
-    
+
     const percent = Math.min(100, (stats.maxLossUsed / limit) * 100);
     if (percent >= 100) return { percent, limit, color: 'bg-red-500', text: 'text-red-500', label: 'Limit Reached ⚠️' };
     if (percent >= 90) return { percent, limit, color: 'bg-amber-500', text: 'text-amber-500', label: 'Critical' };
@@ -66,16 +66,16 @@ export default function Dashboard() {
   const risk = getRiskStatus();
 
   return (
-    <motion.div 
+    <motion.div
       className="space-y-6"
       variants={containerVariants}
       initial="hidden"
       animate="show"
     >
-      
+
       {/* 2.1 Stats Cards (4 Cards) */}
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6">
-        
+
         {/* Balance Card */}
         <motion.div variants={itemVariants} className="bg-slate-800 border border-slate-700 rounded-xl p-6 shadow-lg shadow-slate-900/50 hover:shadow-xl hover:shadow-blue-500/10 transition-all group relative overflow-hidden">
           <div className="absolute -right-4 -top-4 w-24 h-24 bg-blue-500/10 rounded-full blur-xl group-hover:bg-blue-500/20 transition-all" />
@@ -121,11 +121,11 @@ export default function Dashboard() {
           <div className="mt-4 relative z-10">
             <p className="text-3xl font-bold text-slate-100">{stats.winRate.toFixed(1)}%</p>
             <div className="w-full bg-slate-700/50 rounded-full h-1.5 mt-3 overflow-hidden">
-              <motion.div 
+              <motion.div
                 initial={{ width: 0 }}
                 animate={{ width: `${stats.winRate}%` }}
                 transition={{ duration: 1, delay: 0.5 }}
-                className="bg-cyan-500 h-1.5 rounded-full" 
+                className="bg-cyan-500 h-1.5 rounded-full"
               />
             </div>
           </div>
@@ -167,7 +167,7 @@ export default function Dashboard() {
 
       {/* 2.3 Win Streak & Best/Worst & Risk */}
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6">
-        
+
         {/* Win Streak */}
         <motion.div variants={itemVariants} className="bg-slate-800 border border-slate-700 rounded-xl p-6 flex flex-col justify-center items-center text-center relative overflow-hidden">
           <div className="absolute inset-0 bg-gradient-to-b from-orange-500/5 to-transparent pointer-events-none" />
@@ -180,7 +180,9 @@ export default function Dashboard() {
         <motion.div variants={itemVariants} className="bg-slate-800 border border-slate-700 rounded-xl p-6 flex flex-col justify-center items-center text-center relative overflow-hidden">
           <div className="absolute inset-0 bg-gradient-to-b from-emerald-500/5 to-transparent pointer-events-none" />
           <TrendingUp className="w-8 h-8 text-emerald-500 mb-3" />
-          <p className="text-3xl font-bold text-emerald-400">+${stats.bestTrade.toFixed(2)}</p>
+          <p className="text-3xl font-bold text-emerald-400">
+            {stats.bestTrade === 0 ? '-' : `+$${stats.bestTrade.toFixed(2)}`}
+          </p>
           <p className="text-xs text-slate-400 mt-2">Best Trade (PnL)</p>
         </motion.div>
 
@@ -208,9 +210,9 @@ export default function Dashboard() {
             <p className="text-sm text-slate-500 mb-1">/ ${risk.limit.toFixed(2)} Limit</p>
           </div>
           <div className="w-full bg-slate-900 rounded-full h-2 mb-2 overflow-hidden">
-            <motion.div 
+            <motion.div
               initial={{ width: 0 }} animate={{ width: `${risk.percent}%` }} transition={{ duration: 1 }}
-              className={`${risk.color} h-2 rounded-full shadow-[0_0_10px_currentColor]`} 
+              className={`${risk.color} h-2 rounded-full shadow-[0_0_10px_currentColor]`}
             />
           </div>
           <div className="flex justify-between items-center">
@@ -228,7 +230,7 @@ export default function Dashboard() {
             View All <ChevronRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
           </Link>
         </div>
-        
+
         <div className="overflow-x-auto">
           <table className="w-full text-left text-sm text-slate-300">
             <thead className="text-xs text-slate-400 uppercase bg-slate-900/50 border-b border-slate-700/50">
@@ -256,9 +258,8 @@ export default function Dashboard() {
                       {trade.pair}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <span className={`inline-flex items-center px-2 py-1 rounded-md text-xs font-bold ${
-                        trade.direction === 'LONG' ? 'bg-emerald-500/10 text-emerald-400' : 'bg-red-500/10 text-red-400'
-                      }`}>
+                      <span className={`inline-flex items-center px-2 py-1 rounded-md text-xs font-bold ${trade.direction === 'LONG' ? 'bg-emerald-500/10 text-emerald-400' : 'bg-red-500/10 text-red-400'
+                        }`}>
                         {trade.direction}
                       </span>
                     </td>
@@ -284,7 +285,7 @@ export default function Dashboard() {
       {/* Max Loss Settings Modal */}
       {isMaxLossModalOpen && (
         <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-          <motion.div 
+          <motion.div
             initial={{ scale: 0.95, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
             className="bg-slate-800 p-6 rounded-2xl w-full max-w-sm border border-slate-700 shadow-2xl shadow-slate-900/80"
@@ -295,7 +296,7 @@ export default function Dashboard() {
             <form onSubmit={handleSaveMaxLoss} className="space-y-4">
               <div>
                 <label className="block text-sm font-medium text-slate-300 mb-1.5">Limit Type</label>
-                <select value={maxLossData.type} onChange={e => setMaxLossData({...maxLossData, type: e.target.value})} className="w-full bg-slate-900/50 border border-slate-700 rounded-lg px-4 py-2.5 text-white placeholder:text-slate-500 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 hover:border-slate-600 outline-none transition-all duration-200">
+                <select value={maxLossData.type} onChange={e => setMaxLossData({ ...maxLossData, type: e.target.value })} className="w-full bg-slate-900/50 border border-slate-700 rounded-lg px-4 py-2.5 text-white placeholder:text-slate-500 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 hover:border-slate-600 outline-none transition-all duration-200">
                   <option value="FIXED">Fixed Amount (USDT)</option>
                   <option value="PERCENTAGE">Percentage of Balance (%)</option>
                 </select>
@@ -303,7 +304,7 @@ export default function Dashboard() {
               <div>
                 <label className="block text-sm font-medium text-slate-300 mb-1.5">Daily Limit Value</label>
                 <div className="relative">
-                  <input type="number" step="any" required value={maxLossData.value} onChange={e => setMaxLossData({...maxLossData, value: Number(e.target.value)})} className="w-full bg-slate-900/50 border border-slate-700 rounded-lg px-4 py-2.5 pl-8 text-white placeholder:text-slate-500 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 hover:border-slate-600 outline-none transition-all duration-200" />
+                  <input type="number" step="any" required value={maxLossData.value} onChange={e => setMaxLossData({ ...maxLossData, value: Number(e.target.value) })} className="w-full bg-slate-900/50 border border-slate-700 rounded-lg px-4 py-2.5 pl-8 text-white placeholder:text-slate-500 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 hover:border-slate-600 outline-none transition-all duration-200" />
                   <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500">{maxLossData.type === 'FIXED' ? '$' : '%'}</span>
                 </div>
               </div>

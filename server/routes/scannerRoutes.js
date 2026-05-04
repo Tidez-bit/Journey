@@ -5,7 +5,10 @@ const {
   getMultiplePrices,
   calculatePD,
   getScanners,
-  createScanner
+  createScanner,
+  upsertScannerNote,
+  getScannerNotes,
+  analyzePair
 } = require('../controllers/scannerController');
 const { protect } = require('../middleware/authMiddleware');
 
@@ -16,5 +19,12 @@ router.post('/calculate-pd', protect, calculatePD);
 router.route('/')
   .get(protect, getScanners)
   .post(protect, createScanner);
+
+// Scanner notes routes
+router.get('/notes', protect, getScannerNotes);
+router.patch('/notes', protect, upsertScannerNote);
+
+// Auto scan analysis
+router.post('/analyze', protect, analyzePair);
 
 module.exports = router;

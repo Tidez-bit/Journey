@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useTradeStore } from '../store/tradeStore';
 import TradeForm from '../components/TradeForm';
+import { Modal } from '../components/ui/Modal';
+import { ConfirmModal } from '../components/ui/ConfirmModal';
 import { 
   Plus, Edit2, Trash2, ArrowUpRight, ArrowDownRight, 
   Calendar, Search, Filter, RotateCcw, Download,
@@ -9,9 +11,17 @@ import {
 import { motion } from 'framer-motion';
 
 export default function Journal() {
-  const { trades, isLoading, fetchTrades, deleteTrade } = useTradeStore();
+  const { trades, isLoading, fetchTrades, deleteTrade, fetchTradeById } = useTradeStore();
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingTrade, setEditingTrade] = useState<any>(null);
+  
+  // Detail modal state
+  const [selectedTrade, setSelectedTrade] = useState<any>(null);
+  const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
+  
+  // Delete confirmation modal state
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+  const [tradeToDelete, setTradeToDelete] = useState<any>(null);
   
   // Filters
   const [filterPair, setFilterPair] = useState('');
@@ -40,13 +50,86 @@ export default function Journal() {
   };
 
   const handleExport = () => {
-    // Mock export functionality
-    alert("Exporting trades to CSV...");
+    if (!trades || trades.length === 0) {
+      alert('Tidak ada data untuk di-export');
+      return;
+    }
+
+    // Header kolom CSV
+    const headers = [
+      'Date',
+      'Pair',
+      'Direction',
+      'Entry Price',
+      'Exit Price',
+      'Position Size',
+      'Margin',
+      'PnL (USD)',
+      'PnL (%)',
+      'Stop Loss',
+      'Take Profit',
+      'Result',
+      'Notes'
+    ];
+
+    // Baris data
+    const rows = trades.map(trade => [
+      trade.openTime ? new Date(trade.openTime).toLocaleDateString('id-ID') : '',
+      trade.pair || '',
+      trade.direction || '',
+      trade.entryPrice ?? '',
+      trade.exitPrice ?? '',
+      trade.positionSize ?? '',
+      trade.margin ?? '',
+      trade.pnl ?? '',
+      trade.pnlPercent ? `${trade.pnlPercent.toFixed(2)}%` : '',
+      trade.slPrice ?? '',
+      trade.tpPrice ?? '',
+      trade.pnl > 0 ? 'WIN' : trade.pnl < 0 ? 'LOSS' : 'BE',
+      // Escape koma dan quote dalam notes
+      trade.notes ? `"${String(trade.notes).replace(/"/g, '""')}"` : ''
+    ]);
+
+    // Gabungkan header + rows
+    const csvContent = [headers, ...rows]
+      .map(row => row.join(','))
+      .join('\n');
+
+    // Tambahkan BOM untuk Excel agar UTF-8 terbaca dengan benar
+    const BOM = '\uFEFF';
+    const blob = new Blob([BOM + csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+
+    // Trigger download
+    const link = document.createElement('a');
+    const today = new Date().toISOString().split('T')[0]; // format: YYYY-MM-DD
+    link.href = url;
+    link.download = `journey-trades-${today}.csv`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
   };
 
-  const handleDelete = async (id: string) => {
-    if (window.confirm('Are you sure you want to delete this trade?')) {
-      await deleteTrade(id);
+  const handleViewDetail = async (tradeId: string) => {
+    try {
+      const trade = await fetchTradeById(tradeId);
+      setSelectedTrade(trade);
+      setIsDetailModalOpen(true);
+    } catch (error) {
+      console.error('Failed to fetch trade details:', error);
+    }
+  };
+
+  const handleDelete = async (trade: any) => {
+    setTradeToDelete(trade);
+    setIsDeleteModalOpen(true);
+  };
+
+  const confirmDelete = async () => {
+    if (tradeToDelete) {
+      await deleteTrade(tradeToDelete.id);
+      setTradeToDelete(null);
     }
   };
 
@@ -311,10 +394,10 @@ export default function Journal() {
                           <button onClick={() => handleEdit(trade)} className="p-1.5 text-slate-400 hover:text-blue-400 hover:bg-blue-500/10 rounded-md transition-colors" title="Edit">
                             <Edit2 className="w-4 h-4" />
                           </button>
-                          <button className="p-1.5 text-slate-400 hover:text-cyan-400 hover:bg-cyan-500/10 rounded-md transition-colors" title="View Details">
+                          <button onClick={() => handleViewDetail(trade.id)} className="p-1.5 text-slate-400 hover:text-cyan-400 hover:bg-cyan-500/10 rounded-md transition-colors" title="View Details">
                             <Eye className="w-4 h-4" />
                           </button>
-                          <button onClick={() => handleDelete(trade.id)} className="p-1.5 text-slate-400 hover:text-red-400 hover:bg-red-500/10 rounded-md transition-colors" title="Delete">
+                          <button onClick={() => handleDelete(trade)} className="p-1.5 text-slate-400 hover:text-red-400 hover:bg-red-500/10 rounded-md transition-colors" title="Delete">
                             <Trash2 className="w-4 h-4" />
                           </button>
                         </div>
@@ -330,6 +413,152 @@ export default function Journal() {
 
       {/* 3.4 Trade Form Modal (Existing Redesigned Component) */}
       {isFormOpen && <TradeForm onClose={handleCloseForm} tradeToEdit={editingTrade} />}
+
+      {/* Trade Detail Modal */}
+      {isDetailModalOpen && selectedTrade && (
+        <Modal
+          isOpen={isDetailModalOpen}
+          onClose={() => {
+            setIsDetailModalOpen(false);
+            setSelectedTrade(null);
+          }}
+          title={`Detail Trade — ${selectedTrade.pair}`}
+          size="lg"
+        >
+          <div className="space-y-6">
+            {/* Trade Info Grid */}
+            <div className="grid grid-cols-2 gap-4">
+              <DetailRow label="Pair" value={selectedTrade.pair} />
+              <DetailRow 
+                label="Direction" 
+                value={
+                  <span className={`inline-flex items-center px-2.5 py-1 rounded-md text-xs font-bold ${
+                    selectedTrade.direction === 'LONG' 
+                      ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' 
+                      : 'bg-red-500/10 text-red-400 border border-red-500/20'
+                  }`}>
+                    {selectedTrade.direction === 'LONG' ? <ArrowUpRight className="w-3 h-3 mr-1" /> : <ArrowDownRight className="w-3 h-3 mr-1" />}
+                    {selectedTrade.direction}
+                  </span>
+                }
+              />
+              <DetailRow 
+                label="Open Time" 
+                value={new Date(selectedTrade.openTime).toLocaleString('id-ID', { 
+                  day: 'numeric', 
+                  month: 'short', 
+                  year: 'numeric', 
+                  hour: '2-digit', 
+                  minute: '2-digit' 
+                })} 
+              />
+              <DetailRow 
+                label="Close Time" 
+                value={selectedTrade.exitTime ? new Date(selectedTrade.exitTime).toLocaleString('id-ID', { 
+                  day: 'numeric', 
+                  month: 'short', 
+                  year: 'numeric', 
+                  hour: '2-digit', 
+                  minute: '2-digit' 
+                }) : '—'} 
+              />
+            </div>
+
+            {/* Price Info */}
+            <div className="border-t border-slate-700 pt-4">
+              <h3 className="text-sm font-semibold text-slate-400 mb-3">Price Information</h3>
+              <div className="grid grid-cols-2 gap-4">
+                <DetailRow label="Entry Price" value={`$${selectedTrade.entryPrice}`} />
+                <DetailRow label="Exit Price" value={selectedTrade.exitPrice ? `$${selectedTrade.exitPrice}` : '—'} />
+                <DetailRow label="Stop Loss" value={selectedTrade.slPrice ? `$${selectedTrade.slPrice}` : '—'} />
+                <DetailRow label="Take Profit" value={selectedTrade.tpPrice ? `$${selectedTrade.tpPrice}` : '—'} />
+              </div>
+            </div>
+
+            {/* Position & PnL */}
+            <div className="border-t border-slate-700 pt-4">
+              <h3 className="text-sm font-semibold text-slate-400 mb-3">Position & Result</h3>
+              <div className="grid grid-cols-2 gap-4">
+                <DetailRow label="Position Size" value={selectedTrade.positionSize ? `${selectedTrade.positionSize}` : '—'} />
+                <DetailRow label="Margin" value={selectedTrade.margin ? `$${selectedTrade.margin}` : '—'} />
+                <DetailRow 
+                  label="PnL" 
+                  value={`$${selectedTrade.pnl?.toFixed(2) ?? '—'}`}
+                  highlight={selectedTrade.pnl > 0 ? 'green' : selectedTrade.pnl < 0 ? 'red' : undefined}
+                />
+                <DetailRow 
+                  label="PnL %" 
+                  value={selectedTrade.pnlPercent ? `${selectedTrade.pnlPercent.toFixed(2)}%` : '—'}
+                  highlight={selectedTrade.pnl > 0 ? 'green' : selectedTrade.pnl < 0 ? 'red' : undefined}
+                />
+              </div>
+            </div>
+
+            {/* Strategy & Notes */}
+            {(selectedTrade.strategy || selectedTrade.notes) && (
+              <div className="border-t border-slate-700 pt-4">
+                {selectedTrade.strategy && (
+                  <div className="mb-4">
+                    <span className="text-sm font-medium text-slate-400">Strategy</span>
+                    <p className="mt-1 text-slate-200">{selectedTrade.strategy}</p>
+                  </div>
+                )}
+                {selectedTrade.notes && (
+                  <div>
+                    <span className="text-sm font-medium text-slate-400">Notes</span>
+                    <p className="mt-1 text-slate-300 whitespace-pre-wrap">{selectedTrade.notes}</p>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Screenshot */}
+            {selectedTrade.screenshotUrl && (
+              <div className="border-t border-slate-700 pt-4">
+                <span className="text-sm font-medium text-slate-400 block mb-2">Screenshot</span>
+                <img 
+                  src={selectedTrade.screenshotUrl} 
+                  alt="Trade screenshot" 
+                  className="w-full rounded-lg border border-slate-700"
+                />
+              </div>
+            )}
+          </div>
+        </Modal>
+      )}
+
+      {/* Delete Confirmation Modal */}
+      <ConfirmModal
+        isOpen={isDeleteModalOpen}
+        onClose={() => {
+          setIsDeleteModalOpen(false);
+          setTradeToDelete(null);
+        }}
+        onConfirm={confirmDelete}
+        title="Delete Trade"
+        message={
+          tradeToDelete
+            ? `Are you sure you want to delete this trade? ${tradeToDelete.pair} ${tradeToDelete.direction} on ${new Date(tradeToDelete.openTime).toLocaleDateString()}. This action cannot be undone.`
+            : 'Are you sure you want to delete this trade?'
+        }
+        confirmText="Delete"
+        cancelText="Cancel"
+        variant="danger"
+      />
     </motion.div>
   );
 }
+
+// Helper component for detail rows
+const DetailRow = ({ label, value, highlight }: { label: string; value: any; highlight?: 'green' | 'red' }) => (
+  <div className="space-y-1">
+    <span className="text-xs font-medium text-slate-500 uppercase tracking-wider">{label}</span>
+    <div className={`text-sm font-medium ${
+      highlight === 'green' ? 'text-emerald-400' : 
+      highlight === 'red' ? 'text-red-400' : 
+      'text-slate-200'
+    }`}>
+      {value}
+    </div>
+  </div>
+);

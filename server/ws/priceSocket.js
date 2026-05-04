@@ -1,5 +1,6 @@
 const WebSocket = require('ws');
 const priceService = require('../services/priceService');
+const logger = require('../lib/logger');
 
 function setupPriceSocket(server) {
   const wss = new WebSocket.Server({ server, path: '/ws/prices' });
@@ -11,7 +12,7 @@ function setupPriceSocket(server) {
     const clientId = generateClientId();
     clientSubscriptions.set(clientId, new Set());
     
-    console.log(`Client ${clientId} connected to price stream`);
+    logger.info(`Client ${clientId} connected to price stream`);
     
     // Handle incoming messages from client
     ws.on('message', (message) => {
@@ -23,7 +24,7 @@ function setupPriceSocket(server) {
           const subscriptions = clientSubscriptions.get(clientId);
           data.pairs.forEach(pair => subscriptions.add(pair));
           
-          console.log(`Client ${clientId} subscribed to:`, data.pairs);
+          logger.debug(`Client ${clientId} subscribed to: ${data.pairs.join(', ')}`);
           
           // Send initial prices for subscribed pairs
           const initialPrices = priceService.getMultiplePrices(data.pairs);
@@ -36,14 +37,14 @@ function setupPriceSocket(server) {
           const subscriptions = clientSubscriptions.get(clientId);
           data.pairs.forEach(pair => subscriptions.delete(pair));
           
-          console.log(`Client ${clientId} unsubscribed from:`, data.pairs);
+          logger.debug(`Client ${clientId} unsubscribed from: ${data.pairs.join(', ')}`);
         } else if (data.type === 'subscribe_all') {
           // Subscribe to all available pairs
           const allPairs = priceService.getAllPairNames();
           const subscriptions = clientSubscriptions.get(clientId);
           allPairs.forEach(pair => subscriptions.add(pair));
           
-          console.log(`Client ${clientId} subscribed to all pairs`);
+          logger.debug(`Client ${clientId} subscribed to all pairs`);
           
           // Send all prices
           ws.send(JSON.stringify({
@@ -52,7 +53,7 @@ function setupPriceSocket(server) {
           }));
         }
       } catch (err) {
-        console.error('Error parsing client message:', err);
+        logger.error(`Error parsing client message from ${clientId}:`, err);
       }
     });
     
@@ -79,15 +80,15 @@ function setupPriceSocket(server) {
     ws.on('close', () => {
       clearInterval(interval);
       clientSubscriptions.delete(clientId);
-      console.log(`Client ${clientId} disconnected`);
+      logger.info(`Client ${clientId} disconnected`);
     });
     
     ws.on('error', (err) => {
-      console.error(`Client ${clientId} error:`, err);
+      logger.error(`Client ${clientId} error:`, err);
     });
   });
   
-  console.log('Price WebSocket server initialized with subscription support');
+  logger.info('Price WebSocket server initialized with subscription support');
 }
 
 // Generate unique client ID

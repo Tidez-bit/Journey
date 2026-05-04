@@ -11,8 +11,9 @@ const scannerRouter = require('./routes/scannerRoutes');
 const settingsRouter = require('./routes/settingsRoutes');
 const http = require('http');
 const setupPriceSocket = require('./ws/priceSocket');
-const applySecurityMiddleware = require('./middleware/security');
+const { applySecurityMiddleware, authLimiter } = require('./middleware/security');
 const errorHandler = require('./middleware/errorHandler');
+const logger = require('./lib/logger');
 
 const app = express();
 const server = http.createServer(app);
@@ -35,7 +36,8 @@ app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', message: 'Journey API is running' });
 });
 
-app.use('/api/auth', authRouter);
+// Auth routes with strict rate limiting
+app.use('/api/auth', authLimiter, authRouter);
 app.use('/api/transactions', transactionRouter);
 app.use('/api/trades', tradeRouter);
 app.use('/api/dashboard', dashboardRouter);
@@ -48,5 +50,17 @@ app.use('/api/settings', settingsRouter);
 app.use(errorHandler);
 
 server.listen(PORT, () => {
-  console.log(`Server is running on port ${PORT}`);
+  logger.info(`Server is running on port ${PORT}`);
+  logger.info(`Environment: ${process.env.NODE_ENV || 'development'}`);
+});
+
+// Handle unhandled promise rejections
+process.on('unhandledRejection', (err) => {
+  logger.error('Unhandled Promise Rejection:', err);
+});
+
+// Handle uncaught exceptions
+process.on('uncaughtException', (err) => {
+  logger.error('Uncaught Exception:', err);
+  process.exit(1);
 });

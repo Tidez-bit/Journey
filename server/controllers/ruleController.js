@@ -1,6 +1,6 @@
 const prisma = require('../lib/prisma');
 
-const getRules = async (req, res) => {
+const getRules = async (req, res, next) => {
   try {
     const rules = await prisma.rule.findMany({
       where: { userId: req.user.id },
@@ -8,11 +8,11 @@ const getRules = async (req, res) => {
     });
     res.json(rules);
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    next(error);
   }
 };
 
-const createRule = async (req, res) => {
+const createRule = async (req, res, next) => {
   try {
     const { title, description, category, isActive } = req.body;
     
@@ -28,18 +28,20 @@ const createRule = async (req, res) => {
 
     res.status(201).json(rule);
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    next(error);
   }
 };
 
-const updateRule = async (req, res) => {
+const updateRule = async (req, res, next) => {
   try {
     const { id } = req.params;
     const { title, description, category, isActive } = req.body;
 
     const rule = await prisma.rule.findUnique({ where: { id } });
     if (!rule || rule.userId !== req.user.id) {
-      return res.status(404).json({ message: 'Rule not found' });
+      const err = new Error('Rule not found');
+      err.statusCode = 404;
+      return next(err);
     }
 
     const updatedRule = await prisma.rule.update({
@@ -49,17 +51,19 @@ const updateRule = async (req, res) => {
 
     res.json(updatedRule);
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    next(error);
   }
 };
 
-const deleteRule = async (req, res) => {
+const deleteRule = async (req, res, next) => {
   try {
     const { id } = req.params;
 
     const rule = await prisma.rule.findUnique({ where: { id } });
     if (!rule || rule.userId !== req.user.id) {
-      return res.status(404).json({ message: 'Rule not found' });
+      const err = new Error('Rule not found');
+      err.statusCode = 404;
+      return next(err);
     }
 
     // Delete related TradeRules first
@@ -71,11 +75,11 @@ const deleteRule = async (req, res) => {
 
     res.json({ message: 'Rule deleted' });
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    next(error);
   }
 };
 
-const attachRuleToTrade = async (req, res) => {
+const attachRuleToTrade = async (req, res, next) => {
   try {
     const { tradeId, ruleId } = req.body;
 
@@ -83,7 +87,9 @@ const attachRuleToTrade = async (req, res) => {
     const rule = await prisma.rule.findUnique({ where: { id: ruleId } });
 
     if (!trade || trade.userId !== req.user.id || !rule || rule.userId !== req.user.id) {
-      return res.status(404).json({ message: 'Trade or Rule not found' });
+      const err = new Error('Trade or Rule not found');
+      err.statusCode = 404;
+      return next(err);
     }
 
     const tradeRule = await prisma.tradeRule.create({
@@ -98,11 +104,11 @@ const attachRuleToTrade = async (req, res) => {
 
     res.status(201).json(tradeRule);
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    next(error);
   }
 };
 
-const removeRuleFromTrade = async (req, res) => {
+const removeRuleFromTrade = async (req, res, next) => {
   try {
     const { id } = req.params; // TradeRule ID
 
@@ -112,7 +118,9 @@ const removeRuleFromTrade = async (req, res) => {
     });
 
     if (!tradeRule || tradeRule.trade.userId !== req.user.id) {
-      return res.status(404).json({ message: 'TradeRule not found' });
+      const err = new Error('TradeRule not found');
+      err.statusCode = 404;
+      return next(err);
     }
 
     await prisma.tradeRule.delete({ where: { id } });
@@ -131,11 +139,11 @@ const removeRuleFromTrade = async (req, res) => {
 
     res.json({ message: 'Rule removed from trade' });
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    next(error);
   }
 };
 
-const getRuleStats = async (req, res) => {
+const getRuleStats = async (req, res, next) => {
   try {
     const rules = await prisma.rule.findMany({
       where: { userId: req.user.id },
@@ -177,7 +185,7 @@ const getRuleStats = async (req, res) => {
       rules: statsPerRule
     });
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    next(error);
   }
 };
 

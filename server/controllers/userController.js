@@ -1,6 +1,6 @@
 const prisma = require('../lib/prisma');
 
-const getSettings = async (req, res) => {
+const getSettings = async (req, res, next) => {
   try {
     const user = await prisma.user.findUnique({
       where: { id: req.user.id },
@@ -13,11 +13,11 @@ const getSettings = async (req, res) => {
     });
     res.json(user);
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    next(error);
   }
 };
 
-const updateSettings = async (req, res) => {
+const updateSettings = async (req, res, next) => {
   try {
     const { scannerEnabled, maxLossType, maxLossValue, maxLossResetDate } = req.body;
     
@@ -40,7 +40,7 @@ const updateSettings = async (req, res) => {
 
     res.json(user);
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    next(error);
   }
 };
 

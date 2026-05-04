@@ -20,7 +20,7 @@ const generateMockChartData = (basePrice: number) => {
 };
 
 export default function ScannerPro() {
-  const { scanners, selectedDate, selectedTimeframe, watchlist, fetchScanners, setTimeframe, setSelectedDate, createScanner, realTimePrices } = useScannerStore();
+  const { scanners, selectedDate, selectedTimeframe, watchlist, fetchScanners, setTimeframe, setSelectedDate, createScanner, realTimePrices, saveNote, analyzePair } = useScannerStore();
   const { stats, updateSettings, fetchDashboardStats } = useDashboardStore();
   const scannerEnabled = stats?.scannerEnabled ?? true;
   
@@ -31,11 +31,32 @@ export default function ScannerPro() {
   const [selectedScanner, setSelectedScanner] = useState<any>(null);
   const [panelNotes, setPanelNotes] = useState('');
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [isSavingNote, setIsSavingNote] = useState(false);
 
   useEffect(() => {
     fetchScanners(selectedDate, selectedTimeframe);
     if (!stats) fetchDashboardStats();
   }, [selectedDate, selectedTimeframe, fetchScanners, stats, fetchDashboardStats]);
+
+  // Debounced auto-save for notes
+  useEffect(() => {
+    if (!selectedScanner || panelNotes === (selectedScanner.notes || '')) {
+      return;
+    }
+
+    const timeoutId = setTimeout(async () => {
+      try {
+        setIsSavingNote(true);
+        await saveNote(selectedScanner.pair, selectedScanner.timeframe, panelNotes);
+        setIsSavingNote(false);
+      } catch (error) {
+        console.error('Failed to save note:', error);
+        setIsSavingNote(false);
+      }
+    }, 1000);
+
+    return () => clearTimeout(timeoutId);
+  }, [panelNotes, selectedScanner, saveNote]);
 
   const handleManualAdd = () => {
     setFormData({
@@ -64,30 +85,24 @@ export default function ScannerPro() {
 
   const handleAutoScan = async () => {
     setIsRefreshing(true);
-    if (watchlist.length > 0) {
-      // Simulate scan delay
-      await new Promise(r => setTimeout(r, 800));
-      const pair = watchlist[0];
-      const price = realTimePrices[pair]?.price || 65000;
-      await createScanner({
-        date: selectedDate,
-        pair,
-        timeframe: selectedTimeframe,
-        currentPrice: price,
-        lastHigh: price * 1.05,
-        lastLow: price * 0.95,
-        pdArray: 'DISCOUNT',
-        pdPercent: 45,
-        liquiditySide: 'ABOVE',
-        liquidityAbove: price * 1.02,
-        obSide: 'BULLISH',
-        obBullish: (price * 0.98).toString(),
-        trend: 'BULLISH',
-        volume: 'HIGH',
-        bias: 'BULLISH'
-      });
+    try {
+      if (watchlist.length > 0) {
+        const pair = watchlist[0];
+        
+        // Call real analyze endpoint
+        const analysis = await analyzePair(pair, selectedTimeframe);
+        
+        // Create scanner entry with real analysis data
+        await createScanner({
+          date: selectedDate,
+          ...analysis
+        });
+      }
+    } catch (error) {
+      console.error('Auto scan failed:', error);
+    } finally {
+      setIsRefreshing(false);
     }
-    setIsRefreshing(false);
   };
 
   const openDetailPanel = (scanner: any) => {
@@ -95,10 +110,18 @@ export default function ScannerPro() {
     setPanelNotes(scanner.notes || '');
   };
 
-  const saveDetailNotes = () => {
-    // In a real app, update the scanner with the notes
-    alert('Notes saved for ' + selectedScanner.pair);
-    setSelectedScanner(null);
+  const saveDetailNotes = async () => {
+    if (!selectedScanner) return;
+    
+    try {
+      setIsSavingNote(true);
+      await saveNote(selectedScanner.pair, selectedScanner.timeframe, panelNotes);
+      setIsSavingNote(false);
+      setSelectedScanner(null);
+    } catch (error) {
+      console.error('Failed to save note:', error);
+      setIsSavingNote(false);
+    }
   };
 
   const containerVariants = { hidden: { opacity: 0 }, show: { opacity: 1, transition: { staggerChildren: 0.1 } } };
@@ -386,8 +409,8 @@ export default function ScannerPro() {
               </div>
 
               <div className="p-5 border-t border-slate-800 bg-slate-900">
-                <button onClick={saveDetailNotes} className="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold py-3 rounded-xl flex items-center justify-center transition-colors shadow-lg shadow-blue-500/20">
-                  <Save className="w-4 h-4 mr-2" /> Save Analysis
+                <button onClick={saveDetailNotes} disabled={isSavingNote} className="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold py-3 rounded-xl flex items-center justify-center transition-colors shadow-lg shadow-blue-500/20 disabled:opacity-50 disabled:cursor-not-allowed">
+                  <Save className="w-4 h-4 mr-2" /> {isSavingNote ? 'Saving...' : 'Save Analysis'}
                 </button>
               </div>
             </motion.div>

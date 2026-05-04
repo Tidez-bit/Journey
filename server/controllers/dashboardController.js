@@ -1,6 +1,6 @@
 const prisma = require('../lib/prisma');
 
-const getDashboardStats = async (req, res) => {
+const getDashboardStats = async (req, res, next) => {
   try {
     const userId = req.user.id;
 
@@ -10,7 +10,7 @@ const getDashboardStats = async (req, res) => {
     });
 
     // ===== AGGREGATION QUERIES (efficient for large datasets) =====
-    
+
     // Aggregate trade statistics
     const tradeAggregates = await prisma.trade.aggregate({
       where: { userId },
@@ -53,21 +53,21 @@ const getDashboardStats = async (req, res) => {
     });
 
     // ===== CALCULATE BASIC STATS =====
-    
+
     const totalTrades = tradeAggregates._count.id || 0;
     const totalPnL = tradeAggregates._sum.pnl || 0;
-    const bestTrade = tradeAggregates._max.pnl || 0;
+    const bestTrade = winCount > 0 ? (tradeAggregates._max.pnl || 0) : 0;
     const worstTrade = tradeAggregates._min.pnl || 0;
-    
+
     const depositTotal = depositSum._sum.amount || 0;
     const withdrawTotal = withdrawSum._sum.amount || 0;
     const currentBalance = (depositTotal - withdrawTotal) + totalPnL;
-    
+
     const winRate = totalTrades > 0 ? (winCount / totalTrades) * 100 : 0;
-    
+
     const sumWin = winningTrades._sum.pnl || 0;
     const sumLoss = Math.abs(losingTrades._sum.pnl || 0);
-    
+
     const avgWin = winCount > 0 ? sumWin / winCount : 0;
     const avgLoss = lossCount > 0 ? sumLoss / lossCount : 0;
     const profitFactor = sumLoss > 0 ? sumWin / sumLoss : (sumWin > 0 ? sumWin : 0);
@@ -114,7 +114,7 @@ const getDashboardStats = async (req, res) => {
     ninetyDaysAgo.setDate(ninetyDaysAgo.getDate() - 90);
 
     const recentTradesForEquity = await prisma.trade.findMany({
-      where: { 
+      where: {
         userId,
         openTime: { gte: ninetyDaysAgo }
       },
@@ -124,7 +124,7 @@ const getDashboardStats = async (req, res) => {
     });
 
     const recentTransactions = await prisma.transaction.findMany({
-      where: { 
+      where: {
         userId,
         date: { gte: ninetyDaysAgo }
       },
@@ -156,15 +156,15 @@ const getDashboardStats = async (req, res) => {
 
     // Build equity curve
     const allEvents = [
-      ...recentTradesForEquity.map(t => ({ 
-        date: new Date(t.openTime), 
-        type: 'TRADE', 
-        amount: t.pnl || 0 
+      ...recentTradesForEquity.map(t => ({
+        date: new Date(t.openTime),
+        type: 'TRADE',
+        amount: t.pnl || 0
       })),
-      ...recentTransactions.map(t => ({ 
-        date: new Date(t.date), 
-        type: t.type, 
-        amount: t.amount 
+      ...recentTransactions.map(t => ({
+        date: new Date(t.date),
+        type: t.type,
+        amount: t.amount
       }))
     ].sort((a, b) => a.date - b.date);
 
@@ -190,7 +190,7 @@ const getDashboardStats = async (req, res) => {
     thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
 
     const dailyTrades = await prisma.trade.findMany({
-      where: { 
+      where: {
         userId,
         openTime: { gte: thirtyDaysAgo }
       },
@@ -215,10 +215,10 @@ const getDashboardStats = async (req, res) => {
     // ===== TODAY'S LOSS =====
     const today = new Date();
     today.setHours(0, 0, 0, 0);
-    
+
     const todayLosses = await prisma.trade.aggregate({
-      where: { 
-        userId, 
+      where: {
+        userId,
         openTime: { gte: today },
         pnl: { lt: 0 }
       },
@@ -248,7 +248,7 @@ const getDashboardStats = async (req, res) => {
       scannerEnabled: user.scannerEnabled
     });
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    next(error);
   }
 };
 

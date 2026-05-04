@@ -1,6 +1,6 @@
 const prisma = require('../lib/prisma');
 
-const getTargets = async (req, res) => {
+const getTargets = async (req, res, next) => {
   try {
     const targets = await prisma.target.findMany({
       where: { userId: req.user.id },
@@ -14,11 +14,11 @@ const getTargets = async (req, res) => {
     });
     res.json(targets);
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    next(error);
   }
 };
 
-const createTarget = async (req, res) => {
+const createTarget = async (req, res, next) => {
   try {
     const { type, name, startBalance, targetBalance, dailyPercent, deadline } = req.body;
     
@@ -36,18 +36,20 @@ const createTarget = async (req, res) => {
 
     res.status(201).json(target);
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    next(error);
   }
 };
 
-const updateTarget = async (req, res) => {
+const updateTarget = async (req, res, next) => {
   try {
     const { id } = req.params;
     const { name, startBalance, targetBalance, dailyPercent, deadline, isActive } = req.body;
 
     const existingTarget = await prisma.target.findUnique({ where: { id } });
     if (!existingTarget || existingTarget.userId !== req.user.id) {
-      return res.status(404).json({ message: 'Target not found' });
+      const err = new Error('Target not found');
+      err.statusCode = 404;
+      return next(err);
     }
 
     const updatedTarget = await prisma.target.update({
@@ -64,17 +66,19 @@ const updateTarget = async (req, res) => {
 
     res.json(updatedTarget);
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    next(error);
   }
 };
 
-const deleteTarget = async (req, res) => {
+const deleteTarget = async (req, res, next) => {
   try {
     const { id } = req.params;
     
     const existingTarget = await prisma.target.findUnique({ where: { id } });
     if (!existingTarget || existingTarget.userId !== req.user.id) {
-      return res.status(404).json({ message: 'Target not found' });
+      const err = new Error('Target not found');
+      err.statusCode = 404;
+      return next(err);
     }
 
     await prisma.dailyTargetLog.deleteMany({
@@ -85,11 +89,11 @@ const deleteTarget = async (req, res) => {
 
     res.json({ message: 'Target deleted' });
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    next(error);
   }
 };
 
-const getDailyLogs = async (req, res) => {
+const getDailyLogs = async (req, res, next) => {
   try {
     const { startDate, endDate, targetId } = req.query;
     
@@ -113,17 +117,19 @@ const getDailyLogs = async (req, res) => {
 
     res.json(logs);
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    next(error);
   }
 };
 
-const createDailyLog = async (req, res) => {
+const createDailyLog = async (req, res, next) => {
   try {
     const { targetId, date } = req.body;
 
     const target = await prisma.target.findUnique({ where: { id: targetId } });
     if (!target || target.userId !== req.user.id) {
-      return res.status(404).json({ message: 'Target not found' });
+      const err = new Error('Target not found');
+      err.statusCode = 404;
+      return next(err);
     }
 
     const dateObj = new Date(date);
@@ -188,16 +194,18 @@ const createDailyLog = async (req, res) => {
 
     res.status(201).json(log);
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    next(error);
   }
 };
 
-const getProjection = async (req, res) => {
+const getProjection = async (req, res, next) => {
   try {
     const { startBalance, dailyPercent, days } = req.query;
     
     if (!startBalance || !dailyPercent || !days) {
-      return res.status(400).json({ message: 'Please provide startBalance, dailyPercent, and days' });
+      const err = new Error('Please provide startBalance, dailyPercent, and days');
+      err.statusCode = 400;
+      return next(err);
     }
 
     let currentBalance = parseFloat(startBalance);
@@ -223,7 +231,7 @@ const getProjection = async (req, res) => {
       projection
     });
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    next(error);
   }
 };
 

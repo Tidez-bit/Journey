@@ -1,6 +1,6 @@
 const prisma = require('../lib/prisma');
 
-const getTrades = async (req, res) => {
+const getTrades = async (req, res, next) => {
   try {
     const { startDate, endDate, pair } = req.query;
     
@@ -33,11 +33,11 @@ const getTrades = async (req, res) => {
 
     res.json(trades);
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    next(error);
   }
 };
 
-const getTradeById = async (req, res) => {
+const getTradeById = async (req, res, next) => {
   try {
     const trade = await prisma.trade.findUnique({
       where: {
@@ -47,16 +47,18 @@ const getTradeById = async (req, res) => {
     });
 
     if (!trade || trade.userId !== req.user.id) {
-      return res.status(404).json({ message: 'Trade not found' });
+      const err = new Error('Trade not found');
+      err.statusCode = 404;
+      return next(err);
     }
 
     res.json(trade);
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    next(error);
   }
 };
 
-const createTrade = async (req, res) => {
+const createTrade = async (req, res, next) => {
   const {
     openTime,
     exitTime,
@@ -174,15 +176,11 @@ const createTrade = async (req, res) => {
 
     res.status(201).json(tradeWithRules);
   } catch (error) {
-    console.error('Create trade error:', error);
-    res.status(500).json({ 
-      message: 'Failed to create trade', 
-      error: error.message 
-    });
+    next(error);
   }
 };
 
-const updateTrade = async (req, res) => {
+const updateTrade = async (req, res, next) => {
   try {
     const tradeId = req.params.id;
     
@@ -191,7 +189,9 @@ const updateTrade = async (req, res) => {
     });
 
     if (!existingTrade || existingTrade.userId !== req.user.id) {
-      return res.status(404).json({ message: 'Trade not found' });
+      const err = new Error('Trade not found');
+      err.statusCode = 404;
+      return next(err);
     }
 
     const {
@@ -227,7 +227,7 @@ const updateTrade = async (req, res) => {
       const positionValue = newPositionSize * newEntryPrice;
       pnlPercent = positionValue > 0 ? (newPnl / positionValue) * 100 : 0;
     } else {
-      pnlPercent = 0;
+      pnlPercent = existingTrade.pnlPercent ?? 0;
     }
 
     const updatedTrade = await prisma.trade.update({
@@ -277,11 +277,11 @@ const updateTrade = async (req, res) => {
 
     res.json(updatedTradeWithRules);
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    next(error);
   }
 };
 
-const deleteTrade = async (req, res) => {
+const deleteTrade = async (req, res, next) => {
   try {
     const tradeId = req.params.id;
 
@@ -290,7 +290,9 @@ const deleteTrade = async (req, res) => {
     });
 
     if (!existingTrade || existingTrade.userId !== req.user.id) {
-      return res.status(404).json({ message: 'Trade not found' });
+      const err = new Error('Trade not found');
+      err.statusCode = 404;
+      return next(err);
     }
     
     // Handle manual cascade deletion
@@ -302,7 +304,7 @@ const deleteTrade = async (req, res) => {
 
     res.json({ message: 'Trade removed' });
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    next(error);
   }
 };
 

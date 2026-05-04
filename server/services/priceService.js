@@ -1,4 +1,5 @@
 const WebSocket = require('ws');
+const logger = require('../lib/logger');
 
 class PriceService {
   constructor() {
@@ -15,7 +16,7 @@ class PriceService {
     this.ws = new WebSocket('wss://stream.binance.com:9443/ws/!miniTicker@arr');
     
     this.ws.on('open', () => {
-      console.log('Binance WebSocket Connected');
+      logger.info('Binance WebSocket Connected');
     });
 
     this.ws.on('message', (data) => {
@@ -36,16 +37,16 @@ class PriceService {
           });
         }
       } catch (err) {
-        // ignore parse error
+        logger.error('Error parsing Binance message:', err);
       }
     });
 
     this.ws.on('error', (err) => {
-      console.error('Binance WS Error', err);
+      logger.error('Binance WS Error:', err);
     });
 
     this.ws.on('close', () => {
-      console.log('Binance WS Closed, reconnecting in 5s...');
+      logger.warn('Binance WS Closed, reconnecting in 5s...');
       setTimeout(() => this.connect(), 5000);
     });
   }

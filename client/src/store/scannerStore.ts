@@ -15,6 +15,9 @@ interface ScannerState {
   createScanner: (formData: any) => Promise<any>;
   connectWebSocket: () => WebSocket;
   setRealTimePrices: (prices: Record<string, any>) => void;
+  saveNote: (pair: string, timeframe: string, note: string) => Promise<void>;
+  loadNotes: () => Promise<any[]>;
+  analyzePair: (pair: string, timeframe: string) => Promise<any>;
 }
 
 export const useScannerStore = create<ScannerState>((set, get) => ({
@@ -62,5 +65,31 @@ export const useScannerStore = create<ScannerState>((set, get) => ({
     const { data } = await api.post('/scanner', formData);
     set((state) => ({ scanners: [data, ...state.scanners.filter(s => s.id !== data.id)] }));
     return data;
+  },
+
+  saveNote: async (pair, timeframe, note) => {
+    await api.patch('/scanner/notes', { pair, timeframe, note });
+    // Update local state if scanner exists
+    set((state) => ({
+      scanners: state.scanners.map(s => 
+        s.pair === pair && s.timeframe === timeframe 
+          ? { ...s, notes: note }
+          : s
+      )
+    }));
+  },
+
+  loadNotes: async () => {
+    try {
+      const { data } = await api.get('/scanner/notes');
+      return data.data || [];
+    } catch (error) {
+      return [];
+    }
+  },
+
+  analyzePair: async (pair, timeframe) => {
+    const { data } = await api.post('/scanner/analyze', { pair, timeframe });
+    return data.data;
   }
 }));

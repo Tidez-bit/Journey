@@ -8,12 +8,14 @@ const generateToken = (id) => {
   });
 };
 
-const register = async (req, res) => {
+const register = async (req, res, next) => {
   try {
     const { name, email, password } = req.body;
 
     if (!name || !email || !password) {
-      return res.status(400).json({ message: 'Please provide all fields' });
+      const err = new Error('Please provide all fields');
+      err.statusCode = 400;
+      return next(err);
     }
 
     const userExists = await prisma.user.findUnique({
@@ -21,7 +23,9 @@ const register = async (req, res) => {
     });
 
     if (userExists) {
-      return res.status(400).json({ message: 'User already exists' });
+      const err = new Error('User already exists');
+      err.statusCode = 400;
+      return next(err);
     }
 
     const salt = await bcrypt.genSalt(10);
@@ -43,19 +47,23 @@ const register = async (req, res) => {
         token: generateToken(user.id),
       });
     } else {
-      res.status(400).json({ message: 'Invalid user data' });
+      const err = new Error('Invalid user data');
+      err.statusCode = 400;
+      return next(err);
     }
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    next(error);
   }
 };
 
-const login = async (req, res) => {
+const login = async (req, res, next) => {
   try {
     const { email, password } = req.body;
 
     if (!email || !password) {
-      return res.status(400).json({ message: 'Please provide email and password' });
+      const err = new Error('Please provide email and password');
+      err.statusCode = 400;
+      return next(err);
     }
 
     const user = await prisma.user.findUnique({
@@ -70,14 +78,16 @@ const login = async (req, res) => {
         token: generateToken(user.id),
       });
     } else {
-      res.status(401).json({ message: 'Invalid email or password' });
+      const err = new Error('Invalid email or password');
+      err.statusCode = 401;
+      return next(err);
     }
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    next(error);
   }
 };
 
-const getMe = async (req, res) => {
+const getMe = async (req, res, next) => {
   try {
     const user = await prisma.user.findUnique({
       where: { id: req.user.id },
@@ -90,12 +100,14 @@ const getMe = async (req, res) => {
     });
     
     if (!user) {
-      return res.status(404).json({ message: 'User not found' });
+      const err = new Error('User not found');
+      err.statusCode = 404;
+      return next(err);
     }
 
     res.json(user);
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    next(error);
   }
 };
 

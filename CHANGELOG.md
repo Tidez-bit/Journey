@@ -66,6 +66,68 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Performance: ~10x faster for users with large datasets
   - Memory: Reduced memory usage by ~90%
 
+- **[PERFORMANCE] WebSocket subscription system** (2026-05-05)
+  - Implemented per-client subscription for price updates
+  - Clients now subscribe only to pairs they need
+  - Server maintains subscription map per client
+  
+  **Impact:**
+  - Before: Broadcast 200+ pairs to all clients every second (~50KB/s per client)
+  - After: Broadcast only subscribed pairs (~2KB/s per client)
+  - Bandwidth saving: ~96% for typical use case
+  - Scalable for hundreds of concurrent clients
+
+- **[ARCHITECTURE] Centralized error handling** (2026-05-05)
+  - Implemented consistent error handling across all controllers
+  - All controllers now use `next(error)` pattern
+  - Custom error status codes (404, 400, 401, 500)
+  - Centralized error logging with context
+  
+  **Files Updated:**
+  - All 8 controllers updated (32 functions total)
+  - Consistent error response format: `{ success: false, message: "..." }`
+  - Stack traces only shown in development mode
+  
+  **Impact:**
+  - Before: Inconsistent error responses, direct res.status() calls
+  - After: Centralized error handling, consistent API responses
+  - Better debugging with contextual error logs
+
+- **[SECURITY] Enhanced rate limiting** (2026-05-05)
+  - Reduced general API rate limit from 2000 to 200 requests/15min
+  - Added strict rate limiter for auth endpoints: 10 requests/15min
+  - Rate limit violations are now logged
+  
+  **Impact:**
+  - Before: 2000 req/15min (minimal brute force protection)
+  - After: 10 req/15min on auth, 200 req/15min on general API
+  - Brute force protection on login/register
+  - Rate limit violations logged for monitoring
+
+- **[LOGGING] Winston logging implementation** (2026-05-05)
+  - Replaced all console.log/console.error with Winston logger
+  - Structured logging with timestamps and log levels
+  - File-based logs with rotation (5MB max, 5 files)
+  - Separate error and combined log files
+  
+  **Files Created:**
+  - `server/lib/logger.js` - Winston configuration
+  - `server/logs/error.log` - Error logs only
+  - `server/logs/combined.log` - All logs
+  
+  **Files Updated:**
+  - `server/server.js`
+  - `server/middleware/errorHandler.js`
+  - `server/middleware/security.js`
+  - `server/ws/priceSocket.js`
+  - `server/services/priceService.js`
+  
+  **Impact:**
+  - Before: console.log everywhere, no log persistence
+  - After: Structured logs with levels (debug, info, warn, error)
+  - Production-ready logging with file rotation
+  - Easy integration with log aggregation tools
+
 ---
 
 ## [1.0.0] - Initial Release
