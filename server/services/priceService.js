@@ -68,6 +68,10 @@ class PriceService {
   getAllPrices() {
     return Object.fromEntries(this.prices);
   }
+  
+  getAllPairNames() {
+    return Array.from(this.prices.keys());
+  }
 }
 
 module.exports = new PriceService();

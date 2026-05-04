@@ -1,5 +1,4 @@
-const { PrismaClient } = require('@prisma/client');
-const prisma = new PrismaClient();
+const prisma = require('../lib/prisma');
 
 const getTargets = async (req, res) => {
   try {
@@ -135,14 +134,14 @@ const createDailyLog = async (req, res) => {
     const trades = await prisma.trade.findMany({
       where: {
         userId: req.user.id,
-        date: { gte: dateObj, lt: nextDay }
+        openTime: { gte: dateObj, lt: nextDay }
       }
     });
 
     const actualPnl = trades.reduce((sum, t) => sum + (t.pnl || 0), 0);
 
     const prevTrades = await prisma.trade.findMany({
-      where: { userId: req.user.id, date: { lt: dateObj } }
+      where: { userId: req.user.id, openTime: { lt: dateObj } }
     });
     const prevTx = await prisma.transaction.findMany({
       where: { userId: req.user.id, date: { lt: dateObj } }

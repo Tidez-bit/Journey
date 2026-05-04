@@ -1,5 +1,4 @@
-const { PrismaClient } = require('@prisma/client');
-const prisma = new PrismaClient();
+const prisma = require('../lib/prisma');
 
 const getTrades = async (req, res) => {
   try {
@@ -67,6 +66,8 @@ const createTrade = async (req, res) => {
     slPrice,
     tpPrice,
     exitPrice,
+    positionSize,
+    margin,
     pnl,
     strategy,
     screenshotUrl,
@@ -111,7 +112,19 @@ const createTrade = async (req, res) => {
     return res.status(400).json({ message: 'exitTime must be after openTime' });
   }
 
-  const pnlPercent = parseFloat(entryPrice) > 0 ? (parseFloat(pnl) / parseFloat(entryPrice)) * 100 : 0;
+  // Calculate pnlPercent based on margin if available, otherwise based on position value
+  let pnlPercent = 0;
+  if (margin && parseFloat(margin) > 0) {
+    // Best practice: pnl% = (pnl / margin) * 100
+    pnlPercent = (parseFloat(pnl) / parseFloat(margin)) * 100;
+  } else if (positionSize && parseFloat(positionSize) > 0 && parseFloat(entryPrice) > 0) {
+    // Fallback: pnl% = (pnl / position value) * 100
+    const positionValue = parseFloat(positionSize) * parseFloat(entryPrice);
+    pnlPercent = positionValue > 0 ? (parseFloat(pnl) / positionValue) * 100 : 0;
+  } else {
+    // Last resort: if no margin/position data, use pnl as-is (user should provide margin)
+    pnlPercent = 0;
+  }
 
   try {
     const trade = await prisma.trade.create({
@@ -125,6 +138,8 @@ const createTrade = async (req, res) => {
         slPrice: slPrice ? parseFloat(slPrice) : null,
         tpPrice: tpPrice ? parseFloat(tpPrice) : null,
         exitPrice: exitPrice ? parseFloat(exitPrice) : null,
+        positionSize: positionSize ? parseFloat(positionSize) : null,
+        margin: margin ? parseFloat(margin) : null,
         pnl: parseFloat(pnl),
         pnlPercent,
         strategy: strategy || null,
@@ -188,6 +203,8 @@ const updateTrade = async (req, res) => {
       slPrice,
       tpPrice,
       exitPrice,
+      positionSize,
+      margin,
       pnl,
       strategy,
       screenshotUrl,
@@ -200,9 +217,17 @@ const updateTrade = async (req, res) => {
     let pnlPercent = null;
     let newEntryPrice = entryPrice !== undefined ? parseFloat(entryPrice) : existingTrade.entryPrice;
     let newPnl = pnl !== undefined && pnl !== null ? parseFloat(pnl) : existingTrade.pnl;
+    let newMargin = margin !== undefined ? (margin ? parseFloat(margin) : null) : existingTrade.margin;
+    let newPositionSize = positionSize !== undefined ? (positionSize ? parseFloat(positionSize) : null) : existingTrade.positionSize;
     
-    if (newEntryPrice > 0) {
-      pnlPercent = (newPnl / newEntryPrice) * 100;
+    // Calculate pnlPercent based on margin if available
+    if (newMargin && newMargin > 0) {
+      pnlPercent = (newPnl / newMargin) * 100;
+    } else if (newPositionSize && newPositionSize > 0 && newEntryPrice > 0) {
+      const positionValue = newPositionSize * newEntryPrice;
+      pnlPercent = positionValue > 0 ? (newPnl / positionValue) * 100 : 0;
+    } else {
+      pnlPercent = 0;
     }
 
     const updatedTrade = await prisma.trade.update({
@@ -216,6 +241,8 @@ const updateTrade = async (req, res) => {
         slPrice: slPrice !== undefined ? (slPrice ? parseFloat(slPrice) : null) : undefined,
         tpPrice: tpPrice !== undefined ? (tpPrice ? parseFloat(tpPrice) : null) : undefined,
         exitPrice: exitPrice !== undefined ? (exitPrice ? parseFloat(exitPrice) : null) : undefined,
+        positionSize: positionSize !== undefined ? (positionSize ? parseFloat(positionSize) : null) : undefined,
+        margin: margin !== undefined ? (margin ? parseFloat(margin) : null) : undefined,
         pnl: pnl !== undefined && pnl !== null ? parseFloat(pnl) : undefined,
         pnlPercent,
         strategy: strategy !== undefined ? strategy : undefined,

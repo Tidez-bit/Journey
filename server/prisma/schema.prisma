@@ -41,6 +41,8 @@ model Trade {
   slPrice     Float?
   tpPrice     Float?
   exitPrice   Float?
+  positionSize Float?  // Size of position (e.g., 0.1 BTC)
+  margin      Float?   // Margin/capital used for this trade
   
   // Result
   pnl         Float
