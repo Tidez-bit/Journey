@@ -23,12 +23,22 @@ interface Trade {
   updatedAt: string;
 }
 
+interface Pagination {
+  total: number;
+  page: number;
+  limit: number;
+  totalPages: number;
+  hasNext: boolean;
+  hasPrev: boolean;
+}
+
 interface TradeState {
   trades: Trade[];
+  pagination: Pagination | null;
   currentTrade: Trade | null;
   isLoading: boolean;
   error: string | null;
-  fetchTrades: (filters?: { startDate?: string; endDate?: string; pair?: string }) => Promise<void>;
+  fetchTrades: (filters?: { startDate?: string; endDate?: string; pair?: string; page?: number; limit?: number }) => Promise<void>;
   fetchTradeById: (id: string) => Promise<void>;
   createTrade: (data: any) => Promise<boolean>;
   updateTrade: (id: string, data: any) => Promise<boolean>;
@@ -38,6 +48,7 @@ interface TradeState {
 
 export const useTradeStore = create<TradeState>((set, get) => ({
   trades: [],
+  pagination: null,
   currentTrade: null,
   isLoading: false,
   error: null,
@@ -48,9 +59,15 @@ export const useTradeStore = create<TradeState>((set, get) => ({
       if (filters?.startDate) params.append('startDate', filters.startDate);
       if (filters?.endDate) params.append('endDate', filters.endDate);
       if (filters?.pair) params.append('pair', filters.pair);
+      if (filters?.page) params.append('page', filters.page.toString());
+      if (filters?.limit) params.append('limit', filters.limit.toString());
       
       const response = await api.get(`/trades?${params.toString()}`);
-      set({ trades: response.data, isLoading: false });
+      set({ 
+        trades: response.data.data || response.data, 
+        pagination: response.data.pagination || null,
+        isLoading: false 
+      });
     } catch (error: any) {
       set({ error: error.message || 'Failed to fetch trades', isLoading: false });
     }

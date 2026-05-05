@@ -11,6 +11,7 @@ const Transactions = lazy(() => import('./pages/Transactions'));
 const Targets = lazy(() => import('./pages/Targets'));
 const Rules = lazy(() => import('./pages/Rules'));
 const ScannerPro = lazy(() => import('./pages/ScannerPro'));
+const Profile = lazy(() => import('./pages/Profile'));
 
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
@@ -51,6 +52,7 @@ function App() {
           <Route path="targets" element={<Targets />} />
           <Route path="rules" element={<Rules />} />
           <Route path="scanner" element={<ScannerPro />} />
+          <Route path="profile" element={<Profile />} />
         </Route>
       </Routes>
       </BrowserRouter>

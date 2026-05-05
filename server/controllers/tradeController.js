@@ -2,7 +2,17 @@ const prisma = require('../lib/prisma');
 
 const getTrades = async (req, res, next) => {
   try {
-    const { startDate, endDate, pair } = req.query;
+    const { startDate, endDate, pair, page = 1, limit = 20 } = req.query;
+    
+    const pageNum = parseInt(page, 10);
+    const limitNum = parseInt(limit, 10);
+    
+    // Validate pagination params
+    if (pageNum < 1 || limitNum < 1 || limitNum > 100) {
+      return res.status(400).json({ 
+        message: 'Invalid pagination params. Page must be >= 1, limit between 1-100' 
+      });
+    }
     
     let whereClause = { userId: req.user.id };
 
@@ -25,13 +35,32 @@ const getTrades = async (req, res, next) => {
       };
     }
 
+    // Get total count for pagination
+    const total = await prisma.trade.count({ where: whereClause });
+    
+    // Calculate pagination metadata
+    const totalPages = Math.ceil(total / limitNum);
+    const skip = (pageNum - 1) * limitNum;
+
     const trades = await prisma.trade.findMany({
       where: whereClause,
       orderBy: { openTime: 'desc' },
-      include: { tradeRules: true }
+      include: { tradeRules: true },
+      skip,
+      take: limitNum,
     });
 
-    res.json(trades);
+    res.json({
+      data: trades,
+      pagination: {
+        total,
+        page: pageNum,
+        limit: limitNum,
+        totalPages,
+        hasNext: pageNum < totalPages,
+        hasPrev: pageNum > 1,
+      }
+    });
   } catch (error) {
     next(error);
   }

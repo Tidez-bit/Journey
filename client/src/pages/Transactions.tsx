@@ -15,7 +15,7 @@ interface Transaction {
 }
 
 export default function Transactions() {
-  const { transactions, isLoading: txLoading, fetchTransactions, addTransaction, updateTransaction, deleteTransaction } = useTransactionStore();
+  const { transactions, pagination, isLoading: txLoading, fetchTransactions, addTransaction, updateTransaction, deleteTransaction } = useTransactionStore();
   const { trades, fetchTrades } = useTradeStore();
   
   const [type, setType] = useState('DEPOSIT');
@@ -24,6 +24,10 @@ export default function Transactions() {
   const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
   const [error, setError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage] = useState(20);
 
   // Edit modal state
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
@@ -42,9 +46,14 @@ export default function Transactions() {
   const [isDeleting, setIsDeleting] = useState(false);
 
   useEffect(() => {
-    fetchTransactions();
+    fetchTransactions(currentPage, itemsPerPage);
     fetchTrades();
   }, [fetchTransactions, fetchTrades]);
+
+  const handlePageChange = (newPage: number) => {
+    setCurrentPage(newPage);
+    fetchTransactions(newPage, itemsPerPage);
+  };
 
   const netDeposit = transactions.reduce((acc, curr) => {
     if (curr.type === 'DEPOSIT') return acc + curr.amount;
@@ -368,6 +377,62 @@ export default function Transactions() {
                     )}
                   </tbody>
                 </table>
+              </div>
+            )}
+            
+            {/* Pagination Controls */}
+            {pagination && pagination.totalPages > 1 && (
+              <div className="border-t border-slate-700 px-6 py-4 flex items-center justify-between bg-slate-900/50">
+                <div className="text-sm text-slate-400">
+                  Showing <span className="font-medium text-slate-300">{((pagination.page - 1) * pagination.limit) + 1}</span> to{' '}
+                  <span className="font-medium text-slate-300">
+                    {Math.min(pagination.page * pagination.limit, pagination.total)}
+                  </span> of{' '}
+                  <span className="font-medium text-slate-300">{pagination.total}</span> transactions
+                </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => handlePageChange(currentPage - 1)}
+                    disabled={!pagination.hasPrev}
+                    className="px-3 py-1.5 text-sm font-medium text-slate-300 bg-slate-800 border border-slate-700 rounded-lg hover:bg-slate-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                  >
+                    Previous
+                  </button>
+                  <div className="flex items-center gap-1">
+                    {Array.from({ length: Math.min(5, pagination.totalPages) }, (_, i) => {
+                      let pageNum;
+                      if (pagination.totalPages <= 5) {
+                        pageNum = i + 1;
+                      } else if (currentPage <= 3) {
+                        pageNum = i + 1;
+                      } else if (currentPage >= pagination.totalPages - 2) {
+                        pageNum = pagination.totalPages - 4 + i;
+                      } else {
+                        pageNum = currentPage - 2 + i;
+                      }
+                      return (
+                        <button
+                          key={pageNum}
+                          onClick={() => handlePageChange(pageNum)}
+                          className={`px-3 py-1.5 text-sm font-medium rounded-lg transition-colors ${
+                            currentPage === pageNum
+                              ? 'bg-blue-600 text-white'
+                              : 'text-slate-300 bg-slate-800 border border-slate-700 hover:bg-slate-700'
+                          }`}
+                        >
+                          {pageNum}
+                        </button>
+                      );
+                    })}
+                  </div>
+                  <button
+                    onClick={() => handlePageChange(currentPage + 1)}
+                    disabled={!pagination.hasNext}
+                    className="px-3 py-1.5 text-sm font-medium text-slate-300 bg-slate-800 border border-slate-700 rounded-lg hover:bg-slate-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                  >
+                    Next
+                  </button>
+                </div>
               </div>
             )}
           </div>

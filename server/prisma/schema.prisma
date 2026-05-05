@@ -23,6 +23,7 @@ model User {
   dailyTargetLogs DailyTargetLog[]
   rules           Rule[]
   scanners        Scanner[]
+  watchlistItems  WatchlistItem[]
 }
 
 model Trade {
@@ -168,4 +169,16 @@ model Scanner {
   @@unique([userId, date, pair, timeframe])
   @@index([userId, date])
   @@index([userId, pair, timeframe])
+}
+
+model WatchlistItem {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  pair      String
+  order     Int      @default(0)
+  createdAt DateTime @default(now())
+  
+  @@unique([userId, pair])
+  @@index([userId, order])
 }

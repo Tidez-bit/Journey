@@ -1,5 +1,5 @@
 import { NavLink, useNavigate } from 'react-router-dom';
-import { LayoutDashboard, BookOpen, ArrowLeftRight, Target, ShieldAlert, Activity, LogOut, Compass, X } from 'lucide-react';
+import { LayoutDashboard, BookOpen, ArrowLeftRight, Target, ShieldAlert, Activity, LogOut, Compass, X, User } from 'lucide-react';
 import clsx from 'clsx';
 import { useAuthStore } from '../../store/authStore';
 
@@ -10,6 +10,7 @@ const navItems = [
   { name: 'Target', path: '/targets', icon: Target },
   { name: 'Rules', path: '/rules', icon: ShieldAlert },
   { name: 'Scanner', path: '/scanner', icon: Activity },
+  { name: 'Profile', path: '/profile', icon: User },
 ];
 
 interface SidebarProps {

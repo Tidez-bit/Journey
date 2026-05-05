@@ -20,12 +20,17 @@ const generateMockChartData = (basePrice: number) => {
 };
 
 export default function ScannerPro() {
-  const { scanners, selectedDate, selectedTimeframe, watchlist, fetchScanners, setTimeframe, setSelectedDate, createScanner, realTimePrices, saveNote, analyzePair } = useScannerStore();
+  const { scanners, selectedDate, selectedTimeframe, watchlist, fetchScanners, setTimeframe, setSelectedDate, createScanner, realTimePrices, saveNote, analyzePair, fetchWatchlist, addToWatchlist, removeFromWatchlist } = useScannerStore();
   const { stats, updateSettings, fetchDashboardStats } = useDashboardStore();
   const scannerEnabled = stats?.scannerEnabled ?? true;
   
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [formData, setFormData] = useState<any>({ pair: 'BTC/USDT' });
+  
+  // Watchlist management state
+  const [isAddPairModalOpen, setIsAddPairModalOpen] = useState(false);
+  const [newPair, setNewPair] = useState('');
+  const [watchlistError, setWatchlistError] = useState('');
   
   // Detail Panel State
   const [selectedScanner, setSelectedScanner] = useState<any>(null);
@@ -34,9 +39,33 @@ export default function ScannerPro() {
   const [isSavingNote, setIsSavingNote] = useState(false);
 
   useEffect(() => {
+    fetchWatchlist();
     fetchScanners(selectedDate, selectedTimeframe);
     if (!stats) fetchDashboardStats();
-  }, [selectedDate, selectedTimeframe, fetchScanners, stats, fetchDashboardStats]);
+  }, [selectedDate, selectedTimeframe, fetchScanners, fetchWatchlist, stats, fetchDashboardStats]);
+
+  const handleAddPair = async () => {
+    setWatchlistError('');
+    if (!newPair.trim()) {
+      setWatchlistError('Please enter a pair');
+      return;
+    }
+    try {
+      await addToWatchlist(newPair.trim().toUpperCase());
+      setNewPair('');
+      setIsAddPairModalOpen(false);
+    } catch (error: any) {
+      setWatchlistError(error.message || 'Failed to add pair');
+    }
+  };
+
+  const handleRemovePair = async (pair: string) => {
+    try {
+      await removeFromWatchlist(pair);
+    } catch (error: any) {
+      console.error('Failed to remove pair:', error);
+    }
+  };
 
   // Debounced auto-save for notes
   useEffect(() => {
@@ -171,6 +200,14 @@ export default function ScannerPro() {
           <div className="flex-1 xl:flex-none"></div>
 
           <div className="flex items-center gap-3">
+            <button 
+              onClick={() => setIsAddPairModalOpen(true)}
+              className="bg-slate-900 hover:bg-slate-800 border border-slate-700 text-slate-300 px-4 py-2 rounded-xl text-sm font-medium flex items-center transition-colors"
+              title="Manage Watchlist"
+            >
+              <SlidersHorizontal className="w-4 h-4 mr-2" /> Watchlist
+            </button>
+
             <button 
               onClick={() => updateSettings({ scannerEnabled: !scannerEnabled })}
               className={`px-4 py-2 rounded-xl text-xs font-bold flex items-center transition-all ${
@@ -446,6 +483,80 @@ export default function ScannerPro() {
                    <button type="submit" className="flex-1 bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-500 text-white font-bold py-3 rounded-xl shadow-lg shadow-blue-500/25 transition-all">Add to Scanner</button>
                 </div>
               </form>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Watchlist Management Modal */}
+      <AnimatePresence>
+        {isAddPairModalOpen && (
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 bg-black/70 flex items-center justify-center p-4 z-50 backdrop-blur-sm">
+            <motion.div initial={{ scale: 0.95, y: 20 }} animate={{ scale: 1, y: 0 }} exit={{ scale: 0.95, y: 20 }} className="bg-slate-800 p-6 rounded-2xl w-full max-w-md border border-slate-700 shadow-2xl">
+              <div className="flex justify-between items-center mb-6">
+                <h3 className="text-xl font-bold text-slate-100">Manage Watchlist</h3>
+                <button onClick={() => { setIsAddPairModalOpen(false); setWatchlistError(''); }} className="text-slate-400 hover:text-slate-200 transition-colors">
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              {/* Current Watchlist */}
+              <div className="mb-6">
+                <h4 className="text-sm font-semibold text-slate-400 mb-3">Current Pairs</h4>
+                <div className="space-y-2 max-h-48 overflow-y-auto">
+                  {watchlist.length === 0 ? (
+                    <p className="text-slate-500 text-sm text-center py-4">No pairs in watchlist</p>
+                  ) : (
+                    watchlist.map((pair) => (
+                      <div key={pair} className="flex items-center justify-between bg-slate-900/50 border border-slate-700 rounded-lg px-4 py-2">
+                        <span className="text-slate-200 font-medium">{pair}</span>
+                        <button
+                          onClick={() => handleRemovePair(pair)}
+                          className="text-red-400 hover:text-red-300 transition-colors p-1"
+                          title="Remove from watchlist"
+                        >
+                          <Minus className="w-4 h-4" />
+                        </button>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+
+              {/* Add New Pair */}
+              <div>
+                <h4 className="text-sm font-semibold text-slate-400 mb-3">Add New Pair</h4>
+                {watchlistError && (
+                  <div className="bg-red-500/10 border border-red-500/50 text-red-400 px-3 py-2 rounded-lg mb-3 text-sm">
+                    {watchlistError}
+                  </div>
+                )}
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={newPair}
+                    onChange={(e) => setNewPair(e.target.value)}
+                    placeholder="e.g. BTC/USDT"
+                    className="flex-1 bg-slate-900/50 border border-slate-700 rounded-lg px-4 py-2 text-white placeholder:text-slate-500 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none transition-all"
+                    onKeyPress={(e) => e.key === 'Enter' && handleAddPair()}
+                  />
+                  <button
+                    onClick={handleAddPair}
+                    className="bg-blue-600 hover:bg-blue-500 text-white px-4 py-2 rounded-lg font-medium transition-colors flex items-center gap-2"
+                  >
+                    <Plus className="w-4 h-4" /> Add
+                  </button>
+                </div>
+              </div>
+
+              <div className="mt-6 pt-4 border-t border-slate-700">
+                <button
+                  onClick={() => { setIsAddPairModalOpen(false); setWatchlistError(''); setNewPair(''); }}
+                  className="w-full bg-slate-700 hover:bg-slate-600 text-white font-medium py-3 rounded-xl transition-colors"
+                >
+                  Close
+                </button>
+              </div>
             </motion.div>
           </motion.div>
         )}

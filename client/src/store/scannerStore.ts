@@ -1,13 +1,25 @@
 import { create } from 'zustand';
 import api from '../lib/api';
 
+interface WatchlistItem {
+  id: string;
+  userId: string;
+  pair: string;
+  order: number;
+  createdAt: string;
+}
+
 interface ScannerState {
   scanners: any[];
   selectedDate: string;
   selectedTimeframe: string;
   watchlist: string[];
+  watchlistItems: WatchlistItem[];
   realTimePrices: Record<string, any>;
   isLoading: boolean;
+  fetchWatchlist: () => Promise<void>;
+  addToWatchlist: (pair: string) => Promise<void>;
+  removeFromWatchlist: (pair: string) => Promise<void>;
   setWatchlist: (pairs: string[]) => void;
   setTimeframe: (tf: string) => void;
   setSelectedDate: (date: string) => void;
@@ -24,9 +36,46 @@ export const useScannerStore = create<ScannerState>((set, get) => ({
   scanners: [],
   selectedDate: new Date().toISOString().split('T')[0],
   selectedTimeframe: '4H',
-  watchlist: ['BTC/USDT', 'ETH/USDT', 'BNB/USDT', 'SOL/USDT', 'XRP/USDT'],
+  watchlist: [],
+  watchlistItems: [],
   realTimePrices: {},
   isLoading: false,
+
+  fetchWatchlist: async () => {
+    try {
+      const { data } = await api.get('/watchlist');
+      const pairs = data.map((item: WatchlistItem) => item.pair);
+      set({ watchlistItems: data, watchlist: pairs });
+    } catch (error) {
+      console.error('Failed to fetch watchlist:', error);
+      // Fallback to default watchlist if API fails
+      set({ watchlist: ['BTC/USDT', 'ETH/USDT', 'BNB/USDT', 'SOL/USDT', 'XRP/USDT'] });
+    }
+  },
+
+  addToWatchlist: async (pair: string) => {
+    try {
+      const { data } = await api.post('/watchlist', { pair });
+      set((state) => ({
+        watchlistItems: [...state.watchlistItems, data],
+        watchlist: [...state.watchlist, pair],
+      }));
+    } catch (error: any) {
+      throw new Error(error.response?.data?.message || 'Failed to add to watchlist');
+    }
+  },
+
+  removeFromWatchlist: async (pair: string) => {
+    try {
+      await api.delete(`/watchlist/${encodeURIComponent(pair)}`);
+      set((state) => ({
+        watchlistItems: state.watchlistItems.filter((item) => item.pair !== pair),
+        watchlist: state.watchlist.filter((p) => p !== pair),
+      }));
+    } catch (error: any) {
+      throw new Error(error.response?.data?.message || 'Failed to remove from watchlist');
+    }
+  },
 
   setWatchlist: (pairs) => set({ watchlist: pairs }),
   setTimeframe: (tf) => set({ selectedTimeframe: tf }),

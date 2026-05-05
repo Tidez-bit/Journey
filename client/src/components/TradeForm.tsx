@@ -9,7 +9,7 @@ import { Modal } from './ui/Modal';
 import { 
   Clock, LineChart, Target, Shield, ArrowUpCircle, ArrowDownCircle, 
   ChevronDown, Calculator, ShieldAlert, Check, Image as ImageIcon, 
-  Save, PlusCircle, CheckCircle, FileText
+  Save, PlusCircle, CheckCircle, FileText, X
 } from 'lucide-react';
 
 interface TradeFormProps {
@@ -46,6 +46,11 @@ export default function TradeForm({ onClose, tradeToEdit }: TradeFormProps) {
   const [autoCalculatePnL, setAutoCalculatePnL] = useState(false);
   const [dragActive, setDragActive] = useState(false);
   const [currentStep, setCurrentStep] = useState(1);
+  
+  // File upload state
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [filePreview, setFilePreview] = useState<string>('');
+  const [isUploading, setIsUploading] = useState(false);
 
   useEffect(() => {
     fetchRules();
@@ -183,14 +188,98 @@ export default function TradeForm({ onClose, tradeToEdit }: TradeFormProps) {
     return Object.keys(newErrors).length === 0;
   };
 
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      handleFile(file);
+    }
+  };
+
+  const handleFile = (file: File) => {
+    // Validate file type
+    const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
+    if (!allowedTypes.includes(file.type)) {
+      setErrors(prev => ({ ...prev, screenshot: 'Only JPG, PNG, and WEBP images are allowed' }));
+      return;
+    }
+
+    // Validate file size (5MB max)
+    if (file.size > 5 * 1024 * 1024) {
+      setErrors(prev => ({ ...prev, screenshot: 'File size must be less than 5MB' }));
+      return;
+    }
+
+    setSelectedFile(file);
+    
+    // Create preview
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      setFilePreview(reader.result as string);
+    };
+    reader.readAsDataURL(file);
+
+    // Clear any previous errors
+    if (errors.screenshot) {
+      setErrors(prev => {
+        const newErrors = { ...prev };
+        delete newErrors.screenshot;
+        return newErrors;
+      });
+    }
+  };
+
+  const uploadFile = async (): Promise<string | null> => {
+    if (!selectedFile) return null;
+
+    setIsUploading(true);
+    try {
+      const formData = new FormData();
+      formData.append('screenshot', selectedFile);
+
+      const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/upload/screenshot`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`,
+        },
+        body: formData,
+      });
+
+      if (!response.ok) {
+        throw new Error('Upload failed');
+      }
+
+      const data = await response.json();
+      return data.url;
+    } catch (error) {
+      console.error('File upload error:', error);
+      setErrors(prev => ({ ...prev, screenshot: 'Failed to upload file' }));
+      return null;
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     if (e.preventDefault) e.preventDefault();
     
     if (!validateForm()) return;
     setIsLoading(true);
 
+    // Upload file if selected
+    let screenshotUrl = formData.screenshotUrl;
+    if (selectedFile) {
+      const uploadedUrl = await uploadFile();
+      if (uploadedUrl) {
+        screenshotUrl = uploadedUrl;
+      } else {
+        setIsLoading(false);
+        return; // Stop if upload failed
+      }
+    }
+
     const payload = {
       ...formData,
+      screenshotUrl,
       openTime: new Date(formData.openTime).toISOString(),
       exitTime: formData.exitTime ? new Date(formData.exitTime).toISOString() : null,
       entryPrice: parseFloat(formData.entryPrice),
@@ -439,16 +528,55 @@ export default function TradeForm({ onClose, tradeToEdit }: TradeFormProps) {
                   />
                 </div>
 
-                {/* Screenshot URL */}
-                <EnhancedInput
-                  label="Chart Screenshot URL"
-                  type="text"
-                  name="screenshotUrl"
-                  placeholder="https://tradingview.com/x/..."
-                  value={formData.screenshotUrl}
-                  onChange={handleChange}
-                  className="text-sm"
-                />
+                {/* Screenshot Upload */}
+                <div className="space-y-2">
+                  <label className="block text-sm font-medium text-slate-300 flex items-center gap-2">
+                    <ImageIcon className="w-4 h-4 text-blue-400" /> Chart Screenshot
+                  </label>
+                  
+                  {filePreview || formData.screenshotUrl ? (
+                    <div className="relative">
+                      <img 
+                        src={filePreview || formData.screenshotUrl} 
+                        alt="Screenshot preview" 
+                        className="w-full h-48 object-cover rounded-lg border border-slate-700"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setSelectedFile(null);
+                          setFilePreview('');
+                          handleChange('screenshotUrl', '');
+                        }}
+                        className="absolute top-2 right-2 bg-red-500/80 hover:bg-red-500 text-white p-2 rounded-lg transition-colors"
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="relative">
+                      <input
+                        type="file"
+                        accept="image/jpeg,image/jpg,image/png,image/webp"
+                        onChange={handleFileSelect}
+                        className="hidden"
+                        id="screenshot-upload"
+                      />
+                      <label
+                        htmlFor="screenshot-upload"
+                        className="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed border-slate-700 rounded-lg cursor-pointer bg-slate-900/50 hover:bg-slate-900 transition-colors"
+                      >
+                        <ImageIcon className="w-8 h-8 text-slate-500 mb-2" />
+                        <span className="text-sm text-slate-400">Click to upload screenshot</span>
+                        <span className="text-xs text-slate-500 mt-1">JPG, PNG, WEBP (max 5MB)</span>
+                      </label>
+                    </div>
+                  )}
+                  
+                  {errors.screenshot && (
+                    <p className="text-red-400 text-xs mt-1">{errors.screenshot}</p>
+                  )}
+                </div>
 
                 {/* Rule Violation */}
                 <div className="bg-slate-900/50 p-3 rounded-lg border border-slate-700/50">

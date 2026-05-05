@@ -11,9 +11,13 @@ import {
 import { motion } from 'framer-motion';
 
 export default function Journal() {
-  const { trades, isLoading, fetchTrades, deleteTrade, fetchTradeById } = useTradeStore();
+  const { trades, pagination, isLoading, fetchTrades, deleteTrade, fetchTradeById } = useTradeStore();
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingTrade, setEditingTrade] = useState<any>(null);
+  
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(20);
   
   // Detail modal state
   const [selectedTrade, setSelectedTrade] = useState<any>(null);
@@ -29,16 +33,17 @@ export default function Journal() {
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
 
-  const handleFetchFiltered = () => {
-    const filters: any = {};
+  const handleFetchFiltered = (page = 1) => {
+    const filters: any = { page, limit: itemsPerPage };
     if (startDate) filters.startDate = startDate;
     if (endDate) filters.endDate = endDate;
     if (filterPair) filters.pair = filterPair;
+    setCurrentPage(page);
     fetchTrades(filters);
   };
 
   useEffect(() => {
-    handleFetchFiltered();
+    handleFetchFiltered(1);
   }, [fetchTrades]);
 
   const handleResetFilters = () => {
@@ -46,7 +51,12 @@ export default function Journal() {
     setEndDate('');
     setFilterPair('');
     setFilterDirection('');
-    fetchTrades({});
+    setCurrentPage(1);
+    fetchTrades({ page: 1, limit: itemsPerPage });
+  };
+
+  const handlePageChange = (newPage: number) => {
+    handleFetchFiltered(newPage);
   };
 
   const handleExport = () => {
@@ -332,82 +342,140 @@ export default function Journal() {
             <p className="text-slate-400">Loading your journey...</p>
           </div>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-left whitespace-nowrap text-sm">
-              <thead className="bg-slate-900/80 border-b border-slate-700/80 text-slate-400 text-xs uppercase tracking-wider">
-                <tr>
-                  <th className="px-6 py-4 font-semibold">Date</th>
-                  <th className="px-6 py-4 font-semibold">Pair</th>
-                  <th className="px-6 py-4 font-semibold">Direction</th>
-                  <th className="px-6 py-4 font-semibold">Entry</th>
-                  <th className="px-6 py-4 font-semibold">SL</th>
-                  <th className="px-6 py-4 font-semibold">TP</th>
-                  <th className="px-6 py-4 font-semibold">Exit</th>
-                  <th className="px-6 py-4 font-semibold text-right">PnL</th>
-                  <th className="px-6 py-4 font-semibold">Strategy</th>
-                  <th className="px-6 py-4 font-semibold text-center">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-700/50">
-                {displayedTrades.length === 0 ? (
+          <>
+            <div className="overflow-x-auto">
+              <table className="w-full text-left whitespace-nowrap text-sm">
+                <thead className="bg-slate-900/80 border-b border-slate-700/80 text-slate-400 text-xs uppercase tracking-wider">
                   <tr>
-                    <td colSpan={10} className="px-6 py-12 text-center">
-                      <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-slate-900 mb-4">
-                        <Search className="w-8 h-8 text-slate-600" />
-                      </div>
-                      <h3 className="text-slate-200 font-medium text-lg mb-1">No Trades Found</h3>
-                      <p className="text-slate-500">Adjust your filters or add a new trade to get started.</p>
-                    </td>
+                    <th className="px-6 py-4 font-semibold">Date</th>
+                    <th className="px-6 py-4 font-semibold">Pair</th>
+                    <th className="px-6 py-4 font-semibold">Direction</th>
+                    <th className="px-6 py-4 font-semibold">Entry</th>
+                    <th className="px-6 py-4 font-semibold">SL</th>
+                    <th className="px-6 py-4 font-semibold">TP</th>
+                    <th className="px-6 py-4 font-semibold">Exit</th>
+                    <th className="px-6 py-4 font-semibold text-right">PnL</th>
+                    <th className="px-6 py-4 font-semibold">Strategy</th>
+                    <th className="px-6 py-4 font-semibold text-center">Actions</th>
                   </tr>
-                ) : (
-                  displayedTrades.map((trade) => (
-                    <tr key={trade.id} className="hover:bg-slate-700/40 transition-colors group">
-                      <td className="px-6 py-4 text-slate-400">
-                        <div className="flex flex-col">
-                          <span className="text-slate-300">{new Date(trade.openTime).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}</span>
-                          <span className="text-xs">{new Date(trade.openTime).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</span>
+                </thead>
+                <tbody className="divide-y divide-slate-700/50">
+                  {displayedTrades.length === 0 ? (
+                    <tr>
+                      <td colSpan={10} className="px-6 py-12 text-center">
+                        <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-slate-900 mb-4">
+                          <Search className="w-8 h-8 text-slate-600" />
                         </div>
-                      </td>
-                      <td className="px-6 py-4 font-semibold text-slate-200">{trade.pair}</td>
-                      <td className="px-6 py-4">
-                        <span className={`inline-flex items-center px-2.5 py-1 rounded-md text-xs font-bold ${
-                          trade.direction === 'LONG' ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' : 'bg-red-500/10 text-red-400 border border-red-500/20'
-                        }`}>
-                          {trade.direction === 'LONG' ? <ArrowUpRight className="w-3.5 h-3.5 mr-1" /> : <ArrowDownRight className="w-3.5 h-3.5 mr-1" />}
-                          {trade.direction}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4 font-mono text-slate-300">{trade.entryPrice}</td>
-                      <td className="px-6 py-4 font-mono text-slate-400">{trade.slPrice || '-'}</td>
-                      <td className="px-6 py-4 font-mono text-slate-400">{trade.tpPrice || '-'}</td>
-                      <td className="px-6 py-4 font-mono text-slate-300">{trade.exitPrice || '-'}</td>
-                      <td className={`px-6 py-4 text-right font-mono font-bold ${trade.pnl && trade.pnl >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
-                        {trade.pnl && trade.pnl > 0 ? '+' : ''}{trade.pnl?.toFixed(2) || '0.00'}
-                      </td>
-                      <td className="px-6 py-4">
-                        <span className="inline-flex items-center px-2 py-1 rounded bg-slate-900 text-slate-400 text-xs font-medium">
-                          {trade.strategy || 'N/A'}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4">
-                        <div className="flex justify-center items-center space-x-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                          <button onClick={() => handleEdit(trade)} className="p-1.5 text-slate-400 hover:text-blue-400 hover:bg-blue-500/10 rounded-md transition-colors" title="Edit">
-                            <Edit2 className="w-4 h-4" />
-                          </button>
-                          <button onClick={() => handleViewDetail(trade.id)} className="p-1.5 text-slate-400 hover:text-cyan-400 hover:bg-cyan-500/10 rounded-md transition-colors" title="View Details">
-                            <Eye className="w-4 h-4" />
-                          </button>
-                          <button onClick={() => handleDelete(trade)} className="p-1.5 text-slate-400 hover:text-red-400 hover:bg-red-500/10 rounded-md transition-colors" title="Delete">
-                            <Trash2 className="w-4 h-4" />
-                          </button>
-                        </div>
+                        <h3 className="text-slate-200 font-medium text-lg mb-1">No Trades Found</h3>
+                        <p className="text-slate-500">Adjust your filters or add a new trade to get started.</p>
                       </td>
                     </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          </div>
+                  ) : (
+                    displayedTrades.map((trade) => (
+                      <tr key={trade.id} className="hover:bg-slate-700/40 transition-colors group">
+                        <td className="px-6 py-4 text-slate-400">
+                          <div className="flex flex-col">
+                            <span className="text-slate-300">{new Date(trade.openTime).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}</span>
+                            <span className="text-xs">{new Date(trade.openTime).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</span>
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 font-semibold text-slate-200">{trade.pair}</td>
+                        <td className="px-6 py-4">
+                          <span className={`inline-flex items-center px-2.5 py-1 rounded-md text-xs font-bold ${
+                            trade.direction === 'LONG' ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' : 'bg-red-500/10 text-red-400 border border-red-500/20'
+                          }`}>
+                            {trade.direction === 'LONG' ? <ArrowUpRight className="w-3.5 h-3.5 mr-1" /> : <ArrowDownRight className="w-3.5 h-3.5 mr-1" />}
+                            {trade.direction}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4 font-mono text-slate-300">{trade.entryPrice}</td>
+                        <td className="px-6 py-4 font-mono text-slate-400">{trade.slPrice || '-'}</td>
+                        <td className="px-6 py-4 font-mono text-slate-400">{trade.tpPrice || '-'}</td>
+                        <td className="px-6 py-4 font-mono text-slate-300">{trade.exitPrice || '-'}</td>
+                        <td className={`px-6 py-4 text-right font-mono font-bold ${trade.pnl && trade.pnl >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+                          {trade.pnl && trade.pnl > 0 ? '+' : ''}{trade.pnl?.toFixed(2) || '0.00'}
+                        </td>
+                        <td className="px-6 py-4">
+                          <span className="inline-flex items-center px-2 py-1 rounded bg-slate-900 text-slate-400 text-xs font-medium">
+                            {trade.strategy || 'N/A'}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4">
+                          <div className="flex justify-center items-center space-x-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                            <button onClick={() => handleEdit(trade)} className="p-1.5 text-slate-400 hover:text-blue-400 hover:bg-blue-500/10 rounded-md transition-colors" title="Edit">
+                              <Edit2 className="w-4 h-4" />
+                            </button>
+                            <button onClick={() => handleViewDetail(trade.id)} className="p-1.5 text-slate-400 hover:text-cyan-400 hover:bg-cyan-500/10 rounded-md transition-colors" title="View Details">
+                              <Eye className="w-4 h-4" />
+                            </button>
+                            <button onClick={() => handleDelete(trade)} className="p-1.5 text-slate-400 hover:text-red-400 hover:bg-red-500/10 rounded-md transition-colors" title="Delete">
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+            
+            {/* Pagination Controls */}
+            {pagination && pagination.totalPages > 1 && (
+              <div className="border-t border-slate-700 px-6 py-4 flex items-center justify-between bg-slate-900/50">
+                <div className="text-sm text-slate-400">
+                  Showing <span className="font-medium text-slate-300">{((pagination.page - 1) * pagination.limit) + 1}</span> to{' '}
+                  <span className="font-medium text-slate-300">
+                    {Math.min(pagination.page * pagination.limit, pagination.total)}
+                  </span> of{' '}
+                  <span className="font-medium text-slate-300">{pagination.total}</span> trades
+                </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => handlePageChange(currentPage - 1)}
+                    disabled={!pagination.hasPrev}
+                    className="px-3 py-1.5 text-sm font-medium text-slate-300 bg-slate-800 border border-slate-700 rounded-lg hover:bg-slate-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                  >
+                    Previous
+                  </button>
+                  <div className="flex items-center gap-1">
+                    {Array.from({ length: Math.min(5, pagination.totalPages) }, (_, i) => {
+                      let pageNum;
+                      if (pagination.totalPages <= 5) {
+                        pageNum = i + 1;
+                      } else if (currentPage <= 3) {
+                        pageNum = i + 1;
+                      } else if (currentPage >= pagination.totalPages - 2) {
+                        pageNum = pagination.totalPages - 4 + i;
+                      } else {
+                        pageNum = currentPage - 2 + i;
+                      }
+                      return (
+                        <button
+                          key={pageNum}
+                          onClick={() => handlePageChange(pageNum)}
+                          className={`px-3 py-1.5 text-sm font-medium rounded-lg transition-colors ${
+                            currentPage === pageNum
+                              ? 'bg-blue-600 text-white'
+                              : 'text-slate-300 bg-slate-800 border border-slate-700 hover:bg-slate-700'
+                          }`}
+                        >
+                          {pageNum}
+                        </button>
+                      );
+                    })}
+                  </div>
+                  <button
+                    onClick={() => handlePageChange(currentPage + 1)}
+                    disabled={!pagination.hasNext}
+                    className="px-3 py-1.5 text-sm font-medium text-slate-300 bg-slate-800 border border-slate-700 rounded-lg hover:bg-slate-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                  >
+                    Next
+                  </button>
+                </div>
+              </div>
+            )}
+          </>
         )}
       </motion.div>
 
