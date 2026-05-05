@@ -1,19 +1,27 @@
 import React, { useState, useEffect } from 'react';
 import { useTradeStore } from '../store/tradeStore';
 import TradeForm from '../components/TradeForm';
+import TradeAnalytics from '../components/TradeAnalytics';
 import { Modal } from '../components/ui/Modal';
 import { ConfirmModal } from '../components/ui/ConfirmModal';
+import { Badge } from '../components/ui/Badge';
+import { EnhancedInput } from '../components/ui/EnhancedInput';
+import { EnhancedTextarea } from '../components/ui/EnhancedTextarea';
 import { 
   Plus, Edit2, Trash2, ArrowUpRight, ArrowDownRight, 
   Calendar, Search, Filter, RotateCcw, Download,
-  Activity, Target, TrendingUp, TrendingDown, Eye
+  Activity, Target, TrendingUp, TrendingDown, Eye, Clock, CheckCircle,
+  X, Save, Scissors, BarChart3, List
 } from 'lucide-react';
 import { motion } from 'framer-motion';
 
 export default function Journal() {
-  const { trades, pagination, isLoading, fetchTrades, deleteTrade, fetchTradeById } = useTradeStore();
+  const { trades, pagination, isLoading, fetchTrades, deleteTrade, fetchTradeById, createPartialClose, deletePartialClose } = useTradeStore();
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingTrade, setEditingTrade] = useState<any>(null);
+  
+  // Tab state
+  const [activeTab, setActiveTab] = useState<'journal' | 'analytics'>('journal');
   
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1);
@@ -27,9 +35,22 @@ export default function Journal() {
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [tradeToDelete, setTradeToDelete] = useState<any>(null);
   
+  // Partial close state
+  const [showPartialCloseForm, setShowPartialCloseForm] = useState(false);
+  const [partialCloseData, setPartialCloseData] = useState({
+    closeTime: new Date().toISOString().slice(0, 16),
+    closePrice: '',
+    closedSize: '',
+    pnl: '',
+    notes: ''
+  });
+  const [partialCloseToDelete, setPartialCloseToDelete] = useState<any>(null);
+  const [isDeletePartialModalOpen, setIsDeletePartialModalOpen] = useState(false);
+  
   // Filters
   const [filterPair, setFilterPair] = useState('');
   const [filterDirection, setFilterDirection] = useState('');
+  const [filterStatus, setFilterStatus] = useState('');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
 
@@ -38,6 +59,7 @@ export default function Journal() {
     if (startDate) filters.startDate = startDate;
     if (endDate) filters.endDate = endDate;
     if (filterPair) filters.pair = filterPair;
+    if (filterStatus) filters.status = filterStatus;
     setCurrentPage(page);
     fetchTrades(filters);
   };
@@ -51,6 +73,7 @@ export default function Journal() {
     setEndDate('');
     setFilterPair('');
     setFilterDirection('');
+    setFilterStatus('');
     setCurrentPage(1);
     fetchTrades({ page: 1, limit: itemsPerPage });
   };
@@ -153,6 +176,48 @@ export default function Journal() {
     setEditingTrade(null);
   };
 
+  const handlePartialCloseSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedTrade) return;
+
+    const success = await createPartialClose(selectedTrade.id, {
+      closeTime: new Date(partialCloseData.closeTime).toISOString(),
+      closePrice: parseFloat(partialCloseData.closePrice),
+      closedSize: parseFloat(partialCloseData.closedSize),
+      pnl: parseFloat(partialCloseData.pnl),
+      notes: partialCloseData.notes || undefined
+    });
+
+    if (success) {
+      setShowPartialCloseForm(false);
+      setPartialCloseData({
+        closeTime: new Date().toISOString().slice(0, 16),
+        closePrice: '',
+        closedSize: '',
+        pnl: '',
+        notes: ''
+      });
+      // Refresh trade detail
+      const updatedTrade = await fetchTradeById(selectedTrade.id);
+      setSelectedTrade(updatedTrade);
+    }
+  };
+
+  const handleDeletePartialClose = (partial: any) => {
+    setPartialCloseToDelete(partial);
+    setIsDeletePartialModalOpen(true);
+  };
+
+  const confirmDeletePartialClose = async () => {
+    if (partialCloseToDelete && selectedTrade) {
+      await deletePartialClose(selectedTrade.id, partialCloseToDelete.id);
+      setPartialCloseToDelete(null);
+      // Refresh trade detail
+      const updatedTrade = await fetchTradeById(selectedTrade.id);
+      setSelectedTrade(updatedTrade);
+    }
+  };
+
   const displayedTrades = trades.filter(t => filterDirection ? t.direction === filterDirection : true);
   
   let winCount = 0;
@@ -207,7 +272,36 @@ export default function Journal() {
         </button>
       </div>
 
-      {/* 3.1 Filter Bar */}
+      {/* Tab Navigation */}
+      <motion.div variants={itemVariants} className="bg-slate-800 border border-slate-700 rounded-xl p-1 flex gap-1">
+        <button
+          onClick={() => setActiveTab('journal')}
+          className={`flex-1 px-4 py-2.5 rounded-lg text-sm font-medium transition-all flex items-center justify-center gap-2 ${
+            activeTab === 'journal'
+              ? 'bg-blue-600 text-white shadow-lg shadow-blue-500/25'
+              : 'text-slate-400 hover:text-slate-200 hover:bg-slate-700/50'
+          }`}
+        >
+          <List className="w-4 h-4" />
+          Trade List
+        </button>
+        <button
+          onClick={() => setActiveTab('analytics')}
+          className={`flex-1 px-4 py-2.5 rounded-lg text-sm font-medium transition-all flex items-center justify-center gap-2 ${
+            activeTab === 'analytics'
+              ? 'bg-blue-600 text-white shadow-lg shadow-blue-500/25'
+              : 'text-slate-400 hover:text-slate-200 hover:bg-slate-700/50'
+          }`}
+        >
+          <BarChart3 className="w-4 h-4" />
+          Analytics
+        </button>
+      </motion.div>
+
+      {/* Tab Content */}
+      {activeTab === 'journal' ? (
+        <>
+          {/* 3.1 Filter Bar */}
       <motion.div variants={itemVariants} className="bg-slate-800 border border-slate-700 rounded-xl p-5 shadow-lg shadow-slate-900/50 flex flex-wrap items-end gap-4">
         <div className="flex-1 min-w-[140px]">
           <label className="block text-xs font-medium text-slate-400 mb-1.5">Start Date</label>
@@ -256,6 +350,18 @@ export default function Journal() {
             <option value="">All Directions</option>
             <option value="LONG">Long</option>
             <option value="SHORT">Short</option>
+          </select>
+        </div>
+        <div className="flex-1 min-w-[140px]">
+          <label className="block text-xs font-medium text-slate-400 mb-1.5">Status</label>
+          <select 
+            value={filterStatus} 
+            onChange={e => setFilterStatus(e.target.value)} 
+            className="w-full bg-slate-900/50 border border-slate-700 rounded-lg px-4 py-2.5 text-white focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 hover:border-slate-600 outline-none transition-all duration-200"
+          >
+            <option value="">All Trades</option>
+            <option value="RUNNING">Running</option>
+            <option value="CLOSED">Closed</option>
           </select>
         </div>
         
@@ -349,6 +455,7 @@ export default function Journal() {
                   <tr>
                     <th className="px-6 py-4 font-semibold">Date</th>
                     <th className="px-6 py-4 font-semibold">Pair</th>
+                    <th className="px-6 py-4 font-semibold">Status</th>
                     <th className="px-6 py-4 font-semibold">Direction</th>
                     <th className="px-6 py-4 font-semibold">Entry</th>
                     <th className="px-6 py-4 font-semibold">SL</th>
@@ -362,7 +469,7 @@ export default function Journal() {
                 <tbody className="divide-y divide-slate-700/50">
                   {displayedTrades.length === 0 ? (
                     <tr>
-                      <td colSpan={10} className="px-6 py-12 text-center">
+                      <td colSpan={11} className="px-6 py-12 text-center">
                         <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-slate-900 mb-4">
                           <Search className="w-8 h-8 text-slate-600" />
                         </div>
@@ -380,6 +487,15 @@ export default function Journal() {
                           </div>
                         </td>
                         <td className="px-6 py-4 font-semibold text-slate-200">{trade.pair}</td>
+                        <td className="px-6 py-4">
+                          <Badge variant={trade.status === 'RUNNING' ? 'warning' : 'success'}>
+                            {trade.status === 'RUNNING' ? (
+                              <><Clock className="w-3 h-3 mr-1" /> RUNNING</>
+                            ) : (
+                              <><CheckCircle className="w-3 h-3 mr-1" /> CLOSED</>
+                            )}
+                          </Badge>
+                        </td>
                         <td className="px-6 py-4">
                           <span className={`inline-flex items-center px-2.5 py-1 rounded-md text-xs font-bold ${
                             trade.direction === 'LONG' ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' : 'bg-red-500/10 text-red-400 border border-red-500/20'
@@ -478,6 +594,11 @@ export default function Journal() {
           </>
         )}
       </motion.div>
+        </>
+      ) : (
+        /* Analytics Tab */
+        <TradeAnalytics />
+      )}
 
       {/* 3.4 Trade Form Modal (Existing Redesigned Component) */}
       {isFormOpen && <TradeForm onClose={handleCloseForm} tradeToEdit={editingTrade} />}
@@ -494,6 +615,18 @@ export default function Journal() {
           size="lg"
         >
           <div className="space-y-6">
+            {/* Status Badge */}
+            <div className="flex items-center justify-between">
+              <h2 className="text-xl font-bold text-slate-100">Trade Information</h2>
+              <Badge variant={selectedTrade.status === 'RUNNING' ? 'warning' : 'success'} className="text-sm">
+                {selectedTrade.status === 'RUNNING' ? (
+                  <><Clock className="w-4 h-4 mr-1.5" /> RUNNING</>
+                ) : (
+                  <><CheckCircle className="w-4 h-4 mr-1.5" /> CLOSED</>
+                )}
+              </Badge>
+            </div>
+
             {/* Trade Info Grid */}
             <div className="grid grid-cols-2 gap-4">
               <DetailRow label="Pair" value={selectedTrade.pair} />
@@ -591,6 +724,165 @@ export default function Journal() {
                 />
               </div>
             )}
+
+            {/* Partial Closes Section */}
+            {(selectedTrade.status === 'RUNNING' || (selectedTrade.partialclose && selectedTrade.partialclose.length > 0)) && (
+              <div className="border-t border-slate-700 pt-4">
+                <div className="flex items-center justify-between mb-3">
+                  <h3 className="text-sm font-semibold text-slate-400 flex items-center gap-2">
+                    <Scissors className="w-4 h-4 text-blue-400" />
+                    Partial Closes
+                  </h3>
+                  {selectedTrade.status === 'RUNNING' && (
+                    <button
+                      onClick={() => setShowPartialCloseForm(!showPartialCloseForm)}
+                      className="text-xs bg-blue-600 hover:bg-blue-500 text-white px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1"
+                    >
+                      <Plus className="w-3 h-3" />
+                      Add Partial Close
+                    </button>
+                  )}
+                </div>
+
+                {/* Existing Partial Closes */}
+                {selectedTrade.partialclose && selectedTrade.partialclose.length > 0 && (
+                  <div className="space-y-2 mb-4">
+                    {selectedTrade.partialclose.map((pc: any) => (
+                      <div key={pc.id} className="bg-slate-900/50 border border-slate-700 rounded-lg p-3">
+                        <div className="flex items-start justify-between">
+                          <div className="flex-1 grid grid-cols-2 gap-3 text-sm">
+                            <div>
+                              <span className="text-slate-500 text-xs">Close Time</span>
+                              <p className="text-slate-200">{new Date(pc.closeTime).toLocaleString()}</p>
+                            </div>
+                            <div>
+                              <span className="text-slate-500 text-xs">Close Price</span>
+                              <p className="text-slate-200 font-mono">${pc.closePrice}</p>
+                            </div>
+                            <div>
+                              <span className="text-slate-500 text-xs">Closed Size</span>
+                              <p className="text-slate-200 font-mono">{pc.closedSize}</p>
+                            </div>
+                            <div>
+                              <span className="text-slate-500 text-xs">PnL</span>
+                              <p className={`font-mono font-bold ${pc.pnl >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+                                {pc.pnl >= 0 ? '+' : ''}{pc.pnl.toFixed(2)}
+                              </p>
+                            </div>
+                            {pc.notes && (
+                              <div className="col-span-2">
+                                <span className="text-slate-500 text-xs">Notes</span>
+                                <p className="text-slate-300 text-xs">{pc.notes}</p>
+                              </div>
+                            )}
+                          </div>
+                          <button
+                            onClick={() => handleDeletePartialClose(pc)}
+                            className="ml-2 p-1.5 text-slate-400 hover:text-red-400 hover:bg-red-500/10 rounded transition-colors"
+                            title="Delete"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* Partial Close Form */}
+                {showPartialCloseForm && selectedTrade.status === 'RUNNING' && (
+                  <motion.form
+                    initial={{ opacity: 0, height: 0 }}
+                    animate={{ opacity: 1, height: 'auto' }}
+                    exit={{ opacity: 0, height: 0 }}
+                    onSubmit={handlePartialCloseSubmit}
+                    className="bg-slate-900/50 border border-slate-700 rounded-lg p-4 space-y-3"
+                  >
+                    <h4 className="text-sm font-medium text-slate-300 mb-3">Add New Partial Close</h4>
+                    
+                    <div className="grid grid-cols-2 gap-3">
+                      <EnhancedInput
+                        label="Close Time"
+                        type="datetime-local"
+                        value={partialCloseData.closeTime}
+                        onChange={(e) => setPartialCloseData(prev => ({ ...prev, closeTime: (e.target as HTMLInputElement).value }))}
+                        required
+                        className="text-sm"
+                      />
+                      <EnhancedInput
+                        label="Close Price"
+                        type="number"
+                        step="any"
+                        placeholder="0.00"
+                        value={partialCloseData.closePrice}
+                        onChange={(e) => setPartialCloseData(prev => ({ ...prev, closePrice: (e.target as HTMLInputElement).value }))}
+                        required
+                        className="text-sm"
+                      />
+                      <EnhancedInput
+                        label="Closed Size"
+                        type="number"
+                        step="any"
+                        placeholder="0.00"
+                        value={partialCloseData.closedSize}
+                        onChange={(e) => setPartialCloseData(prev => ({ ...prev, closedSize: (e.target as HTMLInputElement).value }))}
+                        required
+                        className="text-sm"
+                      />
+                      <EnhancedInput
+                        label="PnL"
+                        type="number"
+                        step="any"
+                        placeholder="0.00"
+                        value={partialCloseData.pnl}
+                        onChange={(e) => setPartialCloseData(prev => ({ ...prev, pnl: (e.target as HTMLInputElement).value }))}
+                        required
+                        className="text-sm"
+                      />
+                    </div>
+
+                    <EnhancedTextarea
+                      label="Notes (Optional)"
+                      placeholder="e.g., Partial TP hit, took profit at resistance"
+                      value={partialCloseData.notes}
+                      onChange={(e) => setPartialCloseData(prev => ({ ...prev, notes: (e.target as HTMLTextAreaElement).value }))}
+                      rows={2}
+                      className="text-sm"
+                    />
+
+                    <div className="flex items-center gap-2 pt-2">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setShowPartialCloseForm(false);
+                          setPartialCloseData({
+                            closeTime: new Date().toISOString().slice(0, 16),
+                            closePrice: '',
+                            closedSize: '',
+                            pnl: '',
+                            notes: ''
+                          });
+                        }}
+                        className="flex-1 px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg text-sm font-medium transition-colors"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        type="submit"
+                        className="flex-1 px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-sm font-medium transition-colors flex items-center justify-center gap-2"
+                      >
+                        <Save className="w-4 h-4" />
+                        Save Partial Close
+                      </button>
+                    </div>
+                  </motion.form>
+                )}
+
+                {selectedTrade.partialclose && selectedTrade.partialclose.length === 0 && !showPartialCloseForm && (
+                  <p className="text-sm text-slate-500 italic">No partial closes yet.</p>
+                )}
+              </div>
+            )}
           </div>
         </Modal>
       )}
@@ -609,6 +901,21 @@ export default function Journal() {
             ? `Are you sure you want to delete this trade? ${tradeToDelete.pair} ${tradeToDelete.direction} on ${new Date(tradeToDelete.openTime).toLocaleDateString()}. This action cannot be undone.`
             : 'Are you sure you want to delete this trade?'
         }
+        confirmText="Delete"
+        cancelText="Cancel"
+        variant="danger"
+      />
+
+      {/* Delete Partial Close Confirmation Modal */}
+      <ConfirmModal
+        isOpen={isDeletePartialModalOpen}
+        onClose={() => {
+          setIsDeletePartialModalOpen(false);
+          setPartialCloseToDelete(null);
+        }}
+        onConfirm={confirmDeletePartialClose}
+        title="Delete Partial Close"
+        message="Are you sure you want to delete this partial close? This action cannot be undone."
         confirmText="Delete"
         cancelText="Cancel"
         variant="danger"

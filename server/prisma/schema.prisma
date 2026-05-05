@@ -91,7 +91,7 @@ model target {
 }
 
 model trade {
-  id             String      @id @default(cuid())
+  id             String         @id @default(cuid())
   userId         String
   pair           String
   direction      String
@@ -101,9 +101,9 @@ model trade {
   screenshotUrl  String?
   notes          String?
   tags           String?
-  isRuleViolated Boolean     @default(false)
-  createdAt      DateTime    @default(now())
-  updatedAt      DateTime    @updatedAt
+  isRuleViolated Boolean        @default(false)
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
   exitPrice      Float?
   positionSize   Float?
   margin         Float?
@@ -112,12 +112,15 @@ model trade {
   slPrice        Float?
   strategy       String?
   tpPrice        Float?
-  user           user        @relation(fields: [userId], references: [id], map: "Trade_userId_fkey")
+  status         String         @default("CLOSED")
+  user           user           @relation(fields: [userId], references: [id], map: "Trade_userId_fkey")
   traderule      traderule[]
+  partialclose   partialclose[]
 
   @@index([userId], map: "Trade_userId_idx")
   @@index([userId, openTime], map: "Trade_userId_openTime_idx")
   @@index([userId, pair], map: "Trade_userId_pair_idx")
+  @@index([userId, status], map: "Trade_userId_status_idx")
 }
 
 model traderule {
@@ -175,4 +178,19 @@ model watchlistitem {
 
   @@unique([userId, pair], map: "WatchlistItem_userId_pair_key")
   @@index([userId, order], map: "WatchlistItem_userId_order_idx")
+}
+
+model partialclose {
+  id         String   @id @default(cuid())
+  tradeId    String
+  closeTime  DateTime
+  closePrice Float
+  closedSize Float
+  pnl        Float
+  notes      String?  @db.Text
+  createdAt  DateTime @default(now())
+  trade      trade    @relation(fields: [tradeId], references: [id], onDelete: Cascade, map: "PartialClose_tradeId_fkey")
+
+  @@index([tradeId], map: "PartialClose_tradeId_idx")
+  @@index([tradeId, closeTime], map: "PartialClose_tradeId_closeTime_idx")
 }

@@ -9,7 +9,192 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Added - Phase 4: Production Readiness (2026-05-05)
+---
+
+## [1.7.0] - 2026-05-05
+
+### Added - Phase 7: Trade Status & Analytics
+
+#### 1. Trade Status (RUNNING vs CLOSED)
+- **Database:**
+  - Added `status` field to `trade` model (default: "CLOSED")
+  - Values: "RUNNING" or "CLOSED"
+  - Added index on `userId` + `status` for performance
+  - Migration: `20260505225458_add_trade_status_and_partial_close`
+  
+- **Backend:**
+  - Updated `GET /api/trades` to support `status` filter parameter
+  - Updated `POST /api/trades` to accept status field
+  - Updated `PUT /api/trades/:id` to allow status updates
+  - Status validation in controller (only RUNNING or CLOSED)
+  
+- **Frontend:**
+  - Added status toggle in TradeForm (RUNNING/CLOSED with icons)
+  - Added status filter dropdown in Journal page
+  - Added status column in trade list table
+  - Added status badge in trade detail modal
+  - Icons: Clock (RUNNING), CheckCircle (CLOSED)
+  - Color-coded badges: yellow (RUNNING), green (CLOSED)
+  - Helper text explaining status meaning
+  
+- **Impact:**
+  - Better trade lifecycle management
+  - Track open positions separately from closed trades
+  - Clear visual indicators for trade status
+  - Improved filtering capabilities
+
+#### 2. Partial Close Feature
+- **Database:**
+  - Created `partialclose` model with fields:
+    - `id` (auto-generated with cuid)
+    - `tradeId` (foreign key)
+    - `closeTime` (DateTime)
+    - `closePrice` (Float)
+    - `closedSize` (Float)
+    - `pnl` (Float, manual input)
+    - `notes` (String, optional)
+    - `createdAt` (auto-generated)
+  - One-to-many relation with trade
+  - Cascade delete on trade deletion
+  
+- **Backend:**
+  - New endpoints:
+    - `POST /api/trades/:id/partial-close` - Create partial close
+    - `GET /api/trades/:id/partial-close` - Get all partial closes
+    - `DELETE /api/trades/:id/partial-close/:partialId` - Delete partial close
+  - Validation:
+    - Trade ownership verification
+    - Numeric values must be positive
+    - Trade existence check
+  
+- **Frontend:**
+  - Added Partial Close section in Trade Detail Modal
+  - Shows for RUNNING trades or trades with history
+  - Form to add new partial close (only for RUNNING trades)
+  - List display of existing partial closes
+  - Delete button with confirmation modal
+  - Fields: closeTime, closePrice, closedSize, pnl, notes
+  - Proper state management and refresh after operations
+  
+- **Impact:**
+  - Record partial profit-taking
+  - Track position scaling
+  - Better risk management
+  - Complete trade history
+
+#### 3. Advanced Analytics Dashboard
+- **Database:**
+  - No new tables (uses existing trade data)
+  - Server-side aggregation with Prisma
+  
+- **Backend:**
+  - New endpoint: `GET /api/trades/analytics`
+  - Query parameters: `startDate`, `endDate` (optional)
+  - Response includes:
+    - **Metrics:**
+      - Total trades
+      - Win rate (%)
+      - Profit factor
+      - Average win
+      - Average loss
+      - Running trades count
+      - Closed trades count
+    - **PnL per Pair:** Grouped aggregation by pair
+    - **Win Rate per Strategy:** Grouped aggregation by strategy
+    - **Trade Distribution:** Last 30 days, grouped by date
+  - Only CLOSED trades included in calculations
+  - Efficient Prisma queries (no fetching all trades)
+  
+- **Frontend:**
+  - Created new `TradeAnalytics.tsx` component
+  - Added tab navigation in Journal page (Trade List / Analytics)
+  - **Date Range Filters:**
+    - Start date picker
+    - End date picker
+    - Reset button
+  - **7 Metric Cards:**
+    - Total Trades (blue, Activity icon)
+    - Win Rate (cyan, Target icon)
+    - Profit Factor (purple, BarChart3 icon)
+    - Average Win (green, TrendingUp icon)
+    - Average Loss (red, TrendingDown icon)
+    - Running Trades (yellow, Clock icon)
+    - Closed Trades (green, CheckCircle icon)
+  - **Charts (Recharts):**
+    - PnL per Pair bar chart (color-coded: green for profit, red for loss)
+    - Win Rate per Strategy horizontal bar chart
+    - Trade Distribution heatmap (last 30 days with intensity)
+  - Empty state handling
+  - Loading spinner
+  - Responsive grid layout
+  - Smooth animations (Framer Motion)
+  
+- **Impact:**
+  - Comprehensive performance analytics
+  - Data-driven trading decisions
+  - Visual insights with professional charts
+  - Performance optimization with server-side aggregation
+  - Professional analytics dashboard
+
+### Changed
+
+- **Trade Model:**
+  - Added `status` field (default: "CLOSED")
+  - Added `partialclose` relation (one-to-many)
+  - PnL now optional for RUNNING trades
+
+- **Trade Store:**
+  - Added `PartialClose` interface
+  - Added `TradeAnalytics` interface
+  - Updated `Trade` interface with status and partialclose fields
+  - Added `createPartialClose()` method
+  - Added `deletePartialClose()` method
+  - Added `fetchAnalytics()` method
+  - Updated `fetchTrades()` to support status filter
+
+- **Journal Page:**
+  - Added tab navigation (Trade List / Analytics)
+  - Added status filter dropdown
+  - Added status column in table
+  - Added partial close UI in detail modal
+  - Integrated TradeAnalytics component
+
+### Fixed
+
+- **PnL Validation:**
+  - Changed from always required to only required for CLOSED trades
+  - RUNNING trades can have empty PnL (position not yet closed)
+  - PnL field label dynamically changes based on status
+
+- **Status Field:**
+  - Fixed status not being included in form submission payload
+  - Explicitly added `status: formData.status` to payload
+
+### Technical Details
+
+**Files Modified:**
+1. `server/prisma/schema.prisma` - Added status field and partialclose model
+2. `server/controllers/tradeController.js` - Added 4 new endpoints
+3. `server/routes/tradeRoutes.js` - Added new routes
+4. `client/src/store/tradeStore.ts` - Added 3 new methods
+5. `client/src/components/TradeForm.tsx` - Added status toggle
+6. `client/src/pages/Journal.tsx` - Added status filter, tab navigation, partial close UI
+7. `client/src/components/TradeAnalytics.tsx` - NEW component
+
+**Migration:**
+- `20260505225458_add_trade_status_and_partial_close`
+
+**Lines of Code:** ~1000
+
+**Documentation:**
+- `PHASE-7-IMPLEMENTATION-COMPLETE.md` - Initial implementation summary
+- `PHASE-7-ANALYTICS-INTEGRATION-COMPLETE.md` - Final integration summary
+
+---
+
+## [1.5.0] - 2026-05-05
+
+### Added - Phase 4: Production Readiness
 
 #### 1. Pagination System
 - **Backend:**

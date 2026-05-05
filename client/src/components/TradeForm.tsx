@@ -36,7 +36,8 @@ export default function TradeForm({ onClose, tradeToEdit }: TradeFormProps) {
     notes: '',
     tags: '',
     isRuleViolated: false,
-    ruleIds: [] as string[]
+    ruleIds: [] as string[],
+    status: 'CLOSED' as 'RUNNING' | 'CLOSED'
   });
   
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -73,7 +74,8 @@ export default function TradeForm({ onClose, tradeToEdit }: TradeFormProps) {
         notes: tradeToEdit.notes || '',
         tags: tradeToEdit.tags || '',
         isRuleViolated: tradeToEdit.isRuleViolated || false,
-        ruleIds: tradeToEdit.tradeRules ? tradeToEdit.tradeRules.map((tr: any) => tr.ruleId) : []
+        ruleIds: tradeToEdit.tradeRules ? tradeToEdit.tradeRules.map((tr: any) => tr.ruleId) : [],
+        status: tradeToEdit.status || 'CLOSED'
       });
       if (tradeToEdit.isRuleViolated) {
         setShowAdvanced(true);
@@ -176,8 +178,10 @@ export default function TradeForm({ onClose, tradeToEdit }: TradeFormProps) {
     if (!formData.entryPrice || parseFloat(formData.entryPrice) <= 0) {
       newErrors.entryPrice = 'Valid entry price required';
     }
-    if (formData.pnl === '' || formData.pnl === undefined) {
-      newErrors.pnl = 'PnL is required';
+    
+    // PnL only required for CLOSED trades
+    if (formData.status === 'CLOSED' && (formData.pnl === '' || formData.pnl === undefined)) {
+      newErrors.pnl = 'PnL is required for closed trades';
     }
 
     if (formData.exitTime && new Date(formData.exitTime) <= new Date(formData.openTime)) {
@@ -286,7 +290,8 @@ export default function TradeForm({ onClose, tradeToEdit }: TradeFormProps) {
       slPrice: formData.slPrice ? parseFloat(formData.slPrice) : null,
       tpPrice: formData.tpPrice ? parseFloat(formData.tpPrice) : null,
       exitPrice: formData.exitPrice ? parseFloat(formData.exitPrice) : null,
-      pnl: parseFloat(formData.pnl),
+      pnl: formData.pnl ? parseFloat(formData.pnl) : 0,
+      status: formData.status,
       ruleIds: formData.isRuleViolated ? formData.ruleIds : []
     };
 
@@ -417,6 +422,42 @@ export default function TradeForm({ onClose, tradeToEdit }: TradeFormProps) {
               </div>
             </div>
 
+            {/* Status Toggle */}
+            <div className="space-y-1.5">
+              <label className="text-sm font-medium text-slate-300">Position Status <span className="text-red-400">*</span></label>
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  onClick={() => handleChange('status', 'CLOSED')}
+                  className={`
+                    py-2 px-3 rounded-lg text-sm font-semibold transition-all flex items-center justify-center gap-2
+                    ${formData.status === 'CLOSED'
+                      ? 'bg-emerald-500/20 border border-emerald-500 text-emerald-400'
+                      : 'bg-slate-900/50 border border-slate-700 text-slate-400 hover:border-slate-600'}
+                  `}
+                >
+                  <CheckCircle className="w-4 h-4" />
+                  CLOSED
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleChange('status', 'RUNNING')}
+                  className={`
+                    py-2 px-3 rounded-lg text-sm font-semibold transition-all flex items-center justify-center gap-2
+                    ${formData.status === 'RUNNING'
+                      ? 'bg-yellow-500/20 border border-yellow-500 text-yellow-400'
+                      : 'bg-slate-900/50 border border-slate-700 text-slate-400 hover:border-slate-600'}
+                  `}
+                >
+                  <Clock className="w-4 h-4" />
+                  RUNNING
+                </button>
+              </div>
+              <p className="text-xs text-slate-500 mt-1">
+                {formData.status === 'RUNNING' ? '⚡ Position is still active' : '✓ Position is closed'}
+              </p>
+            </div>
+
             {/* Prices - 3 Column Grid */}
             <div className="grid grid-cols-3 gap-3">
               <EnhancedInput
@@ -442,14 +483,14 @@ export default function TradeForm({ onClose, tradeToEdit }: TradeFormProps) {
                 className="text-sm"
               />
               <EnhancedInput
-                label="PnL *"
+                label={formData.status === 'RUNNING' ? 'PnL (Optional)' : 'PnL *'}
                 type="number"
                 step="any"
                 name="pnl"
                 placeholder="0"
                 value={formData.pnl}
                 onChange={handleChange}
-                required
+                required={formData.status === 'CLOSED'}
                 error={errors.pnl}
                 className={`text-sm ${formData.pnl ? (parseFloat(formData.pnl) > 0 ? 'text-emerald-400 font-bold bg-emerald-500/5 border-emerald-500/30' : parseFloat(formData.pnl) < 0 ? 'text-red-400 font-bold bg-red-500/5 border-red-500/30' : '') : ''}`}
               />
