@@ -56,8 +56,8 @@ const getProfile = async (req, res, next) => {
         createdAt: true,
         _count: {
           select: {
-            trades: true,
-            transactions: true,
+            trade: true,
+            transaction: true,
           }
         }
       }
@@ -74,8 +74,8 @@ const getProfile = async (req, res, next) => {
       name: user.name,
       email: user.email,
       createdAt: user.createdAt,
-      totalTrades: user._count.trades,
-      totalTransactions: user._count.transactions,
+      totalTrade: user._count.trade,
+      totalTransaction: user._count.transaction,
     });
   } catch (error) {
     next(error);

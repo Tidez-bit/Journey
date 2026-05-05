@@ -2,7 +2,7 @@ const prisma = require('../lib/prisma');
 
 const getWatchlist = async (req, res, next) => {
   try {
-    const watchlist = await prisma.watchlistItem.findMany({
+    const watchlist = await prisma.watchlistitem.findMany({
       where: { userId: req.user.id },
       orderBy: { order: 'asc' },
     });
@@ -22,8 +22,7 @@ const addWatchlistItem = async (req, res, next) => {
       return next(err);
     }
 
-    // Check if already exists
-    const existing = await prisma.watchlistItem.findUnique({
+    const existing = await prisma.watchlistitem.findUnique({
       where: {
         userId_pair: {
           userId: req.user.id,
@@ -38,15 +37,14 @@ const addWatchlistItem = async (req, res, next) => {
       return next(err);
     }
 
-    // Get max order
-    const maxOrderItem = await prisma.watchlistItem.findFirst({
+    const maxOrderItem = await prisma.watchlistitem.findFirst({
       where: { userId: req.user.id },
       orderBy: { order: 'desc' },
     });
 
     const newOrder = maxOrderItem ? maxOrderItem.order + 1 : 0;
 
-    const watchlistItem = await prisma.watchlistItem.create({
+    const watchlistItem = await prisma.watchlistitem.create({
       data: {
         userId: req.user.id,
         pair,
@@ -64,7 +62,7 @@ const deleteWatchlistItem = async (req, res, next) => {
   try {
     const { pair } = req.params;
 
-    const existing = await prisma.watchlistItem.findUnique({
+    const existing = await prisma.watchlistitem.findUnique({
       where: {
         userId_pair: {
           userId: req.user.id,
@@ -79,7 +77,7 @@ const deleteWatchlistItem = async (req, res, next) => {
       return next(err);
     }
 
-    await prisma.watchlistItem.delete({
+    await prisma.watchlistitem.delete({
       where: {
         userId_pair: {
           userId: req.user.id,

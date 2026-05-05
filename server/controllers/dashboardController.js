@@ -106,7 +106,7 @@ const getDashboardStats = async (req, res, next) => {
       where: { userId },
       orderBy: { openTime: 'desc' },
       take: 5,
-      include: { tradeRules: true }
+      include: { traderule: true }
     });
 
     // ===== EQUITY CURVE (limited to last 90 days or 500 events) =====

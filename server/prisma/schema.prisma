@@ -7,178 +7,172 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-model User {
-  id        String   @id @default(uuid())
-  email     String   @unique
-  password  String
-  name      String
-  createdAt        DateTime @default(now())
-  scannerEnabled   Boolean  @default(true)
-  maxLossType      String   @default("FIXED") // FIXED | PERCENTAGE
-  maxLossValue     Float    @default(0)
-  maxLossResetDate DateTime?
-  trades          Trade[]
-  transactions    Transaction[]
-  targets         Target[]
-  dailyTargetLogs DailyTargetLog[]
-  rules           Rule[]
-  scanners        Scanner[]
-  watchlistItems  WatchlistItem[]
-}
-
-model Trade {
-  id          String   @id @default(uuid())
-  userId      String
-  user        User     @relation(fields: [userId], references: [id])
-  
-  // Trade Timing
-  openTime    DateTime
-  exitTime    DateTime?
-  
-  // Trade Details
-  pair        String
-  direction   String   // "LONG" | "SHORT"
-  entryPrice  Float
-  slPrice     Float?
-  tpPrice     Float?
-  exitPrice   Float?
-  positionSize Float?  // Size of position (e.g., 0.1 BTC)
-  margin      Float?   // Margin/capital used for this trade
-  
-  // Result
-  pnl         Float
-  pnlPercent  Float?
-  
-  // Metadata
-  strategy    String?
-  screenshotUrl String?
-  notes       String?
-  tags        String?
-  
-  // Rule Violation
-  isRuleViolated Boolean @default(false)
-  tradeRules  TradeRule[]
-  
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  
-  @@index([userId])
-  @@index([userId, openTime])
-  @@index([userId, pair])
-}
-
-model Transaction {
-  id        String   @id @default(uuid())
-  userId    String
-  user      User     @relation(fields: [userId], references: [id])
-  type      String   // DEPOSIT / WITHDRAW
-  amount    Float
-  note      String?
-  date      DateTime
-  createdAt DateTime @default(now())
-}
-
-model Target {
-  id            String   @id @default(uuid())
-  userId        String
-  user          User     @relation(fields: [userId], references: [id])
-  type          String   // GLOBAL / DAILY
-  name          String
-  startBalance  Float
-  targetBalance Float
-  dailyPercent  Float?   // untuk daily compounding
-  deadline      DateTime?
-  isActive      Boolean  @default(true)
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
-
-  dailyTargetLogs DailyTargetLog[]
-}
-
-model DailyTargetLog {
-  id           String   @id @default(uuid())
+model dailytargetlog {
+  id           String   @id @default(cuid())
   targetId     String
-  target       Target   @relation(fields: [targetId], references: [id])
   userId       String
-  user         User     @relation(fields: [userId], references: [id])
   date         DateTime
   balanceStart Float
   targetAmount Float
   actualPnl    Float
   isAchieved   Boolean  @default(false)
   createdAt    DateTime @default(now())
+  target       target   @relation(fields: [targetId], references: [id], map: "DailyTargetLog_targetId_fkey")
+  user         user     @relation(fields: [userId], references: [id], map: "DailyTargetLog_userId_fkey")
 
-  @@unique([userId, date])
+  @@unique([userId, date], map: "DailyTargetLog_userId_date_key")
+  @@index([targetId], map: "DailyTargetLog_targetId_fkey")
 }
 
-model Rule {
-  id          String   @id @default(uuid())
+model rule {
+  id          String      @id @default(cuid())
   userId      String
-  user        User     @relation(fields: [userId], references: [id])
   title       String
-  description String?  @db.Text
+  description String?     @db.Text
+  isActive    Boolean     @default(true)
+  createdAt   DateTime    @default(now())
   category    String?
-  isActive    Boolean  @default(true)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  updatedAt   DateTime    @updatedAt
+  user        user        @relation(fields: [userId], references: [id], map: "Rule_userId_fkey")
+  traderule   traderule[]
 
-  tradeRules TradeRule[]
+  @@index([userId], map: "Rule_userId_fkey")
 }
 
-model TradeRule {
-  id        String   @id @default(uuid())
+model scanner {
+  id             String   @id @default(cuid())
+  userId         String
+  date           DateTime
+  pair           String
+  volume         String
+  bias           String
+  notes          String?  @db.Text
+  createdAt      DateTime @default(now())
+  confidence     Int?
+  currentPrice   Float
+  lastHigh       Float
+  lastLow        Float
+  liquidityAbove Float?
+  liquidityBelow Float?
+  liquiditySide  String?
+  obBearish      String?
+  obBullish      String?
+  obSide         String?
+  pdArray        String
+  pdPercent      Float
+  structure      String?
+  timeframe      String
+  trend          String
+  updatedAt      DateTime    @updatedAt
+  volumeRatio    Float?
+  user           user     @relation(fields: [userId], references: [id], map: "Scanner_userId_fkey")
+
+  @@unique([userId, date, pair, timeframe], map: "Scanner_userId_date_pair_timeframe_key")
+  @@index([userId, date], map: "Scanner_userId_date_idx")
+  @@index([userId, pair, timeframe], map: "Scanner_userId_pair_timeframe_idx")
+}
+
+model target {
+  id             String           @id @default(cuid())
+  userId         String
+  type           String
+  name           String
+  startBalance   Float
+  targetBalance  Float
+  dailyPercent   Float?
+  deadline       DateTime?
+  isActive       Boolean          @default(true)
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+  dailytargetlog dailytargetlog[]
+  user           user             @relation(fields: [userId], references: [id], map: "Target_userId_fkey")
+
+  @@index([userId], map: "Target_userId_fkey")
+}
+
+model trade {
+  id             String      @id @default(cuid())
+  userId         String
+  pair           String
+  direction      String
+  entryPrice     Float
+  pnl            Float
+  pnlPercent     Float?
+  screenshotUrl  String?
+  notes          String?
+  tags           String?
+  isRuleViolated Boolean     @default(false)
+  createdAt      DateTime    @default(now())
+  updatedAt      DateTime    @updatedAt
+  exitPrice      Float?
+  positionSize   Float?
+  margin         Float?
+  exitTime       DateTime?
+  openTime       DateTime
+  slPrice        Float?
+  strategy       String?
+  tpPrice        Float?
+  user           user        @relation(fields: [userId], references: [id], map: "Trade_userId_fkey")
+  traderule      traderule[]
+
+  @@index([userId], map: "Trade_userId_idx")
+  @@index([userId, openTime], map: "Trade_userId_openTime_idx")
+  @@index([userId, pair], map: "Trade_userId_pair_idx")
+}
+
+model traderule {
+  id        String   @id @default(cuid())
   tradeId   String
-  trade     Trade    @relation(fields: [tradeId], references: [id], onDelete: Cascade)
   ruleId    String
-  rule      Rule     @relation(fields: [ruleId], references: [id], onDelete: Cascade)
   createdAt DateTime @default(now())
+  rule      rule     @relation(fields: [ruleId], references: [id], onDelete: Cascade, map: "TradeRule_ruleId_fkey")
+  trade     trade    @relation(fields: [tradeId], references: [id], onDelete: Cascade, map: "TradeRule_tradeId_fkey")
 
-  @@unique([tradeId, ruleId])
-  @@index([tradeId])
-  @@index([ruleId])
+  @@unique([tradeId, ruleId], map: "TradeRule_tradeId_ruleId_key")
+  @@index([ruleId], map: "TradeRule_ruleId_idx")
+  @@index([tradeId], map: "TradeRule_tradeId_idx")
 }
 
-model Scanner {
-  id              String   @id @default(uuid())
-  userId          String
-  user            User     @relation(fields: [userId], references: [id])
-  date            DateTime
-  pair            String   
-  timeframe       String   
-  currentPrice    Float
-  lastHigh        Float    
-  lastLow         Float    
-  pdArray         String   
-  pdPercent       Float    
-  liquidityAbove  Float?   
-  liquidityBelow  Float?   
-  liquiditySide   String?  
-  obBullish       String?  
-  obBearish       String?  
-  obSide          String?  
-  trend           String   
-  structure       String?  
-  volume          String   
-  volumeRatio     Float?   
-  bias            String   
-  confidence      Int?     
-  notes           String?  @db.Text
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
-  
-  @@unique([userId, date, pair, timeframe])
-  @@index([userId, date])
-  @@index([userId, pair, timeframe])
-}
-
-model WatchlistItem {
-  id        String   @id @default(uuid())
+model transaction {
+  id        String   @id @default(cuid())
   userId    String
-  user      User     @relation(fields: [userId], references: [id])
+  type      String
+  amount    Float
+  note      String?
+  date      DateTime
+  createdAt DateTime @default(now())
+  user      user     @relation(fields: [userId], references: [id], map: "Transaction_userId_fkey")
+
+  @@index([userId], map: "Transaction_userId_fkey")
+}
+
+model user {
+  id               String           @id @default(cuid())
+  email            String           @unique(map: "User_email_key")
+  password         String
+  name             String
+  createdAt        DateTime         @default(now())
+  maxLossResetDate DateTime?
+  maxLossType      String           @default("FIXED")
+  maxLossValue     Float            @default(0)
+  scannerEnabled   Boolean          @default(true)
+  dailytargetlog   dailytargetlog[]
+  rule             rule[]
+  scanner          scanner[]
+  target           target[]
+  trade            trade[]
+  transaction      transaction[]
+  watchlistitem    watchlistitem[]
+}
+
+model watchlistitem {
+  id        String   @id @default(cuid())
+  userId    String
   pair      String
   order     Int      @default(0)
   createdAt DateTime @default(now())
-  
-  @@unique([userId, pair])
-  @@index([userId, order])
+  user      user     @relation(fields: [userId], references: [id], map: "WatchlistItem_userId_fkey")
+
+  @@unique([userId, pair], map: "WatchlistItem_userId_pair_key")
+  @@index([userId, order], map: "WatchlistItem_userId_order_idx")
 }

@@ -45,7 +45,7 @@ const getTrades = async (req, res, next) => {
     const trades = await prisma.trade.findMany({
       where: whereClause,
       orderBy: { openTime: 'desc' },
-      include: { tradeRules: true },
+      include: { traderule: true },
       skip,
       take: limitNum,
     });
@@ -72,7 +72,7 @@ const getTradeById = async (req, res, next) => {
       where: {
         id: req.params.id,
       },
-      include: { tradeRules: true }
+      include: { traderule: true }
     });
 
     if (!trade || trade.userId !== req.user.id) {
@@ -186,7 +186,7 @@ const createTrade = async (req, res, next) => {
         tradeId: trade.id,
         ruleId: ruleId,
       }));
-      await prisma.tradeRule.createMany({ 
+      await prisma.traderule.createMany({ 
         data: tradeRulesData,
         skipDuplicates: true
       });
@@ -195,7 +195,7 @@ const createTrade = async (req, res, next) => {
     const tradeWithRules = await prisma.trade.findUnique({
       where: { id: trade.id },
       include: {
-        tradeRules: {
+        traderule: {
           include: {
             rule: true,
           },
@@ -283,10 +283,10 @@ const updateTrade = async (req, res, next) => {
     });
 
     if (ruleIds !== undefined && Array.isArray(ruleIds)) {
-      await prisma.tradeRule.deleteMany({ where: { tradeId } });
+      await prisma.traderule.deleteMany({ where: { tradeId } });
       if (ruleIds.length > 0) {
         const tradeRulesData = ruleIds.map(ruleId => ({ tradeId, ruleId }));
-        await prisma.tradeRule.createMany({ 
+        await prisma.traderule.createMany({ 
           data: tradeRulesData,
           skipDuplicates: true
         });
@@ -296,7 +296,7 @@ const updateTrade = async (req, res, next) => {
     const updatedTradeWithRules = await prisma.trade.findUnique({
       where: { id: tradeId },
       include: {
-        tradeRules: {
+        traderule: {
           include: {
             rule: true,
           },
@@ -325,7 +325,7 @@ const deleteTrade = async (req, res, next) => {
     }
     
     // Handle manual cascade deletion
-    await prisma.tradeRule.deleteMany({ where: { tradeId } });
+    await prisma.traderule.deleteMany({ where: { tradeId } });
 
     await prisma.trade.delete({
       where: { id: tradeId },

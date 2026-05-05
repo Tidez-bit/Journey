@@ -67,7 +67,7 @@ const deleteRule = async (req, res, next) => {
     }
 
     // Delete related TradeRules first
-    await prisma.tradeRule.deleteMany({
+    await prisma.traderule.deleteMany({
       where: { ruleId: id }
     });
 
@@ -92,7 +92,7 @@ const attachRuleToTrade = async (req, res, next) => {
       return next(err);
     }
 
-    const tradeRule = await prisma.tradeRule.create({
+    const tradeRule = await prisma.traderule.create({
       data: { tradeId, ruleId }
     });
 
@@ -112,7 +112,7 @@ const removeRuleFromTrade = async (req, res, next) => {
   try {
     const { id } = req.params; // TradeRule ID
 
-    const tradeRule = await prisma.tradeRule.findUnique({
+    const tradeRule = await prisma.traderule.findUnique({
       where: { id },
       include: { trade: true }
     });
@@ -123,10 +123,10 @@ const removeRuleFromTrade = async (req, res, next) => {
       return next(err);
     }
 
-    await prisma.tradeRule.delete({ where: { id } });
+    await prisma.traderule.delete({ where: { id } });
 
     // Check if trade still has other violations, if not set isRuleViolated to false
-    const remainingRules = await prisma.tradeRule.count({
+    const remainingRules = await prisma.traderule.count({
       where: { tradeId: tradeRule.tradeId }
     });
 
@@ -149,7 +149,7 @@ const getRuleStats = async (req, res, next) => {
       where: { userId: req.user.id },
       include: {
         _count: {
-          select: { tradeRules: true }
+          select: { traderule: true }
         }
       }
     });
@@ -166,7 +166,7 @@ const getRuleStats = async (req, res, next) => {
     const violationRate = totalTrades === 0 ? 0 : (tradesWithViolation / totalTrades) * 100;
 
     const statsPerRule = rules.map(rule => {
-      const violations = rule._count.tradeRules;
+      const violations = rule._count.traderule;
       const rate = totalTrades === 0 ? 0 : (violations / totalTrades) * 100;
       return {
         id: rule.id,

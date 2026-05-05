@@ -6,7 +6,7 @@ const getTargets = async (req, res, next) => {
       where: { userId: req.user.id },
       orderBy: { createdAt: 'desc' },
       include: {
-        dailyTargetLogs: {
+        dailytargetlog: {
           orderBy: { date: 'desc' },
           take: 5
         }
@@ -81,7 +81,7 @@ const deleteTarget = async (req, res, next) => {
       return next(err);
     }
 
-    await prisma.dailyTargetLog.deleteMany({
+    await prisma.dailytargetlog.deleteMany({
       where: { targetId: id }
     });
 
@@ -110,7 +110,7 @@ const getDailyLogs = async (req, res, next) => {
       };
     }
 
-    const logs = await prisma.dailyTargetLog.findMany({
+    const logs = await prisma.dailytargetlog.findMany({
       where: whereClause,
       orderBy: { date: 'desc' }
     });
@@ -168,7 +168,7 @@ const createDailyLog = async (req, res, next) => {
     const targetAmount = balanceStart * (dailyPercent / 100);
     const isAchieved = actualPnl >= targetAmount;
 
-    const log = await prisma.dailyTargetLog.upsert({
+    const log = await prisma.dailytargetlog.upsert({
       where: {
         userId_date: {
           userId: req.user.id,

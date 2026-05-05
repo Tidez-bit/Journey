@@ -174,8 +174,7 @@ const upsertScannerNote = async (req, res, next) => {
         }
       },
       update: {
-        notes: note,
-        updatedAt: new Date()
+        notes: note
       },
       create: {
         userId,
