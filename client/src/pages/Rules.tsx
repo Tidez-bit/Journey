@@ -4,6 +4,7 @@ import { Shield, ShieldAlert, CheckCircle, Plus, Edit2, Trash2, X, BrainCircuit,
 import { ResponsiveContainer, BarChart, CartesianGrid, XAxis, YAxis, Tooltip, Bar, Cell } from 'recharts';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Modal } from '../components/ui/Modal';
+import { ConfirmModal } from '../components/ui/ConfirmModal';
 import { EnhancedInput } from '../components/ui/EnhancedInput';
 import { EnhancedTextarea } from '../components/ui/EnhancedTextarea';
 
@@ -13,6 +14,10 @@ export default function Rules() {
   const [editingRule, setEditingRule] = useState<any>(null);
   const [formData, setFormData] = useState({ title: '', description: '', category: 'ENTRY' });
   const [filterCategory, setFilterCategory] = useState('');
+  
+  // Delete confirmation modal state
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+  const [ruleToDelete, setRuleToDelete] = useState<string | null>(null);
 
   useEffect(() => {
     fetchRules();
@@ -45,8 +50,15 @@ export default function Rules() {
   };
 
   const handleDelete = async (id: string) => {
-    if (window.confirm('Are you sure you want to delete this rule? This cannot be undone.')) {
-      await deleteRule(id);
+    setRuleToDelete(id);
+    setIsDeleteModalOpen(true);
+  };
+
+  const confirmDelete = async () => {
+    if (ruleToDelete) {
+      await deleteRule(ruleToDelete);
+      setRuleToDelete(null);
+      setIsDeleteModalOpen(false);
     }
   };
 
@@ -335,6 +347,21 @@ export default function Rules() {
           </div>
         </form>
       </Modal>
+
+      {/* Delete Confirmation Modal */}
+      <ConfirmModal
+        isOpen={isDeleteModalOpen}
+        onClose={() => {
+          setIsDeleteModalOpen(false);
+          setRuleToDelete(null);
+        }}
+        onConfirm={confirmDelete}
+        title="Delete Rule"
+        message="Are you sure you want to delete this rule? This action cannot be undone."
+        confirmText="Delete"
+        cancelText="Cancel"
+        variant="danger"
+      />
     </motion.div>
   );
 }

@@ -8,7 +8,8 @@ const {
   createScanner,
   upsertScannerNote,
   getScannerNotes,
-  analyzePair
+  analyzePair,
+  deleteScanner
 } = require('../controllers/scannerController');
 const { protect } = require('../middleware/authMiddleware');
 
@@ -19,6 +20,9 @@ router.post('/calculate-pd', protect, calculatePD);
 router.route('/')
   .get(protect, getScanners)
   .post(protect, createScanner);
+
+// Delete scanner record
+router.delete('/:id', protect, deleteScanner);
 
 // Scanner notes routes
 router.get('/notes', protect, getScannerNotes);

@@ -18,6 +18,9 @@ export default function Targets() {
   
   const [projectionDays, setProjectionDays] = useState(30);
   const [currentMonth, setCurrentMonth] = useState(new Date());
+  
+  // Status message state
+  const [statusMessage, setStatusMessage] = useState<string | null>(null);
 
   useEffect(() => {
     fetchTargets();
@@ -71,10 +74,15 @@ export default function Targets() {
   };
 
   const handleCalculateToday = async () => {
-    if (!dailyTarget) return alert("Set a daily target first!");
+    if (!dailyTarget) {
+      setStatusMessage("Set a daily target first!");
+      setTimeout(() => setStatusMessage(null), 3000);
+      return;
+    }
     const today = new Date().toISOString().split('T')[0];
     await createDailyLog({ targetId: dailyTarget.id, date: today });
-    alert("Calculated and saved log for today!");
+    setStatusMessage("Calculated and saved log for today!");
+    setTimeout(() => setStatusMessage(null), 3000);
   };
 
   const nextMonth = () => setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, 1));
@@ -99,9 +107,16 @@ export default function Targets() {
           <h1 className="text-2xl sm:text-3xl font-bold text-slate-100">Targets & Compounding</h1>
           <p className="text-sm text-slate-400 mt-1">Track your progress and stay consistent</p>
         </div>
-        <button onClick={handleCalculateToday} className="bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-500 hover:to-blue-400 text-white px-5 py-2.5 rounded-lg flex items-center transition-all shadow-lg shadow-blue-500/25 hover:scale-105 active:scale-95 font-medium">
-          <TrendingUp className="w-5 h-5 mr-2" /> Mark Today
-        </button>
+        <div className="flex items-center gap-3">
+          {statusMessage && (
+            <div className="bg-blue-500/10 border border-blue-500/30 text-blue-400 px-4 py-2 rounded-lg text-sm font-medium animate-fade-in">
+              {statusMessage}
+            </div>
+          )}
+          <button onClick={handleCalculateToday} className="bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-500 hover:to-blue-400 text-white px-5 py-2.5 rounded-lg flex items-center transition-all shadow-lg shadow-blue-500/25 hover:scale-105 active:scale-95 font-medium">
+            <TrendingUp className="w-5 h-5 mr-2" /> Mark Today
+          </button>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">

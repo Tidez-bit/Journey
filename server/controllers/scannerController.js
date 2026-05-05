@@ -236,15 +236,29 @@ const analyzePair = async (req, res, next) => {
       return next(err);
     }
 
-    // Get current price from price service
+    // Convert pair format for Binance API if needed
+    // Frontend sends: "ETH/USDT", Binance needs: "ETHUSDT"
+    const binancePair = pair.replace('/', '');
+    
+    // Get current price from price service (uses slash format internally)
     const priceData = priceService.getPrice(pair);
     if (!priceData) {
-      const err = new Error('Price data not available for this pair');
+      // Log for debugging
+      console.error(`Price data not available for pair: ${pair} (Binance format: ${binancePair})`);
+      const err = new Error(`Price data not available for this pair: ${pair}`);
       err.statusCode = 404;
       return next(err);
     }
 
     const currentPrice = priceData.price;
+    
+    // Validate price data
+    if (!currentPrice || currentPrice <= 0) {
+      console.error(`Invalid price data for ${pair}: ${currentPrice}`);
+      const err = new Error(`Invalid price data for ${pair}`);
+      err.statusCode = 500;
+      return next(err);
+    }
     
     // Calculate mock high/low based on current price (in real app, fetch from exchange API)
     const volatility = 0.05; // 5% range
@@ -276,7 +290,7 @@ const analyzePair = async (req, res, next) => {
     if (pdResult.pdArray === 'PREMIUM' && obSide === 'BEARISH') bias = 'BEARISH';
 
     const analysis = {
-      pair,
+      pair, // Keep original format with slash for database
       timeframe: timeframe || '4H',
       currentPrice,
       lastHigh,
@@ -301,6 +315,44 @@ const analyzePair = async (req, res, next) => {
   }
 };
 
+const deleteScanner = async (req, res, next) => {
+  try {
+    const id = parseInt(req.params.id);
+    
+    // Validate ID is a valid number
+    if (isNaN(id)) {
+      const err = new Error('Invalid scanner ID');
+      err.statusCode = 400;
+      return next(err);
+    }
+    
+    const userId = req.user.id;
+
+    // Verify record exists and belongs to user
+    const record = await prisma.scanner.findFirst({
+      where: { 
+        id, 
+        userId 
+      }
+    });
+
+    if (!record) {
+      const err = new Error('Scanner record not found');
+      err.statusCode = 404;
+      return next(err);
+    }
+
+    // Delete the record
+    await prisma.scanner.delete({
+      where: { id }
+    });
+
+    res.json({ message: 'Scanner record deleted successfully' });
+  } catch (error) {
+    next(error);
+  }
+};
+
 module.exports = {
   getRealTimePrice,
   getMultiplePrices,
@@ -309,5 +361,6 @@ module.exports = {
   createScanner,
   upsertScannerNote,
   getScannerNotes,
-  analyzePair
+  analyzePair,
+  deleteScanner
 };

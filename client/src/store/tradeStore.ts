@@ -39,7 +39,7 @@ interface TradeState {
   isLoading: boolean;
   error: string | null;
   fetchTrades: (filters?: { startDate?: string; endDate?: string; pair?: string; page?: number; limit?: number }) => Promise<void>;
-  fetchTradeById: (id: string) => Promise<void>;
+  fetchTradeById: (id: string) => Promise<Trade | null>;
   createTrade: (data: any) => Promise<boolean>;
   updateTrade: (id: string, data: any) => Promise<boolean>;
   deleteTrade: (id: string) => Promise<boolean>;
@@ -77,8 +77,10 @@ export const useTradeStore = create<TradeState>((set, get) => ({
     try {
       const response = await api.get(`/trades/${id}`);
       set({ currentTrade: response.data, isLoading: false });
+      return response.data;
     } catch (error: any) {
       set({ error: error.message || 'Failed to fetch trade details', isLoading: false });
+      return null;
     }
   },
   createTrade: async (data) => {

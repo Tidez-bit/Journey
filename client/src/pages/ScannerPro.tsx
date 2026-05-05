@@ -5,9 +5,10 @@ import PriceTicker from '../components/PriceTicker';
 import PDArrayVisual from '../components/PDArrayVisual';
 import LiquidityMarker from '../components/LiquidityMarker';
 import OrderBlockBadge from '../components/OrderBlockBadge';
-import { RefreshCw, Search, Plus, SlidersHorizontal, BarChart2, Zap, ArrowUpRight, ArrowDownRight, Activity, X, Save, Eye, TrendingUp, TrendingDown, Minus } from 'lucide-react';
+import { RefreshCw, Search, Plus, SlidersHorizontal, BarChart2, Zap, ArrowUpRight, ArrowDownRight, Activity, X, Save, Eye, TrendingUp, TrendingDown, Minus, Trash2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
+import { ConfirmModal } from '../components/ui/ConfirmModal';
 
 const TIMEFRAMES = ['15m', '1H', '4H', '1D', '1W'];
 
@@ -35,8 +36,13 @@ export default function ScannerPro() {
   // Detail Panel State
   const [selectedScanner, setSelectedScanner] = useState<any>(null);
   const [panelNotes, setPanelNotes] = useState('');
-  const [isRefreshing, setIsRefreshing] = useState(false);
   const [isSavingNote, setIsSavingNote] = useState(false);
+
+  // Multi-pair scanning state (per-pair)
+  const [scanningPairs, setScanningPairs] = useState<Record<string, boolean>>({});
+
+  // Delete confirmation state (string because Prisma returns Int as string in JSON)
+  const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null);
 
   useEffect(() => {
     fetchWatchlist();
@@ -112,25 +118,49 @@ export default function ScannerPro() {
     setIsAddModalOpen(false);
   };
 
-  const handleAutoScan = async () => {
-    setIsRefreshing(true);
+  // Helper to check if a specific pair is scanning
+  const isScanningPair = (pair: string) => scanningPairs[pair] === true;
+
+  // Scan a specific pair
+  const handleScanPair = async (pair: string) => {
+    setScanningPairs(prev => ({ ...prev, [pair]: true }));
     try {
-      if (watchlist.length > 0) {
-        const pair = watchlist[0];
-        
-        // Call real analyze endpoint
-        const analysis = await analyzePair(pair, selectedTimeframe);
-        
-        // Create scanner entry with real analysis data
-        await createScanner({
-          date: selectedDate,
-          ...analysis
-        });
-      }
+      // Call real analyze endpoint
+      const analysis = await analyzePair(pair, selectedTimeframe);
+      
+      // Create scanner entry with real analysis data
+      await createScanner({
+        date: selectedDate,
+        ...analysis
+      });
     } catch (error) {
-      console.error('Auto scan failed:', error);
+      console.error('Scan failed for', pair, error);
     } finally {
-      setIsRefreshing(false);
+      setScanningPairs(prev => ({ ...prev, [pair]: false }));
+    }
+  };
+
+  // Delete scanner record
+  const handleDeleteScanner = async () => {
+    if (!deleteTargetId) return;
+    
+    try {
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/scanner/${deleteTargetId}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        }
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to delete scanner record');
+      }
+
+      // Refresh scanner list
+      await fetchScanners(selectedDate, selectedTimeframe);
+      setDeleteTargetId(null);
+    } catch (error) {
+      console.error('Failed to delete scanner record:', error);
     }
   };
 
@@ -219,15 +249,6 @@ export default function ScannerPro() {
               <div className={`w-2 h-2 rounded-full mr-2 ${scannerEnabled ? 'bg-emerald-400 animate-pulse' : 'bg-slate-600'}`}></div>
               {scannerEnabled ? 'SCANNER ON' : 'SCANNER OFF'}
             </button>
-
-            <button 
-              onClick={handleAutoScan} 
-              disabled={isRefreshing}
-              className="bg-slate-900 hover:bg-slate-800 border border-slate-700 text-slate-300 px-3 py-2 rounded-xl transition-colors disabled:opacity-50"
-              title="Refresh Auto Scan"
-            >
-              <RefreshCw className={`w-4 h-4 ${isRefreshing ? 'animate-spin text-blue-400' : ''}`} />
-            </button>
             
             <button 
               onClick={handleManualAdd} 
@@ -243,6 +264,35 @@ export default function ScannerPro() {
       <motion.div variants={itemVariants}>
         <PriceTicker />
       </motion.div>
+
+      {/* 7.2.5 Watchlist Quick Scan */}
+      {watchlist.length > 0 && (
+        <motion.div variants={itemVariants} className="bg-slate-800 border border-slate-700 rounded-2xl p-4 shadow-xl shadow-slate-900/50">
+          <div className="flex items-center justify-between mb-3">
+            <h3 className="text-sm font-bold text-slate-100 flex items-center">
+              <Zap className="w-4 h-4 mr-2 text-yellow-500" /> Quick Scan Watchlist
+            </h3>
+            <span className="text-xs text-slate-500">{watchlist.length} pairs</span>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {watchlist.map((pair) => (
+              <button
+                key={pair}
+                onClick={() => handleScanPair(pair)}
+                disabled={isScanningPair(pair)}
+                className="flex items-center gap-2 bg-slate-900 hover:bg-slate-700 border border-slate-700 hover:border-blue-500/30 text-slate-300 px-3 py-2 rounded-lg text-sm font-medium transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {isScanningPair(pair) ? (
+                  <RefreshCw className="w-3 h-3 animate-spin text-blue-400" />
+                ) : (
+                  <Search className="w-3 h-3" />
+                )}
+                {pair}
+              </button>
+            ))}
+          </div>
+        </motion.div>
+      )}
 
       {/* 7.3 Scanner Table */}
       <motion.div variants={itemVariants} className="bg-slate-800 border border-slate-700 rounded-2xl overflow-hidden shadow-xl shadow-slate-900/50">
@@ -262,21 +312,22 @@ export default function ScannerPro() {
                 <th className="px-6 py-4">Liquidity</th>
                 <th className="px-6 py-4">Order Block</th>
                 <th className="px-6 py-4">Structure</th>
-                <th className="px-6 py-4 text-center">Action</th>
+                <th className="px-6 py-4 text-center">Scan</th>
+                <th className="px-6 py-4 text-center">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-700/50">
               {scanners.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="px-6 py-16 text-center">
+                  <td colSpan={8} className="px-6 py-16 text-center">
                     <Zap className="w-12 h-12 text-slate-600 mx-auto mb-3" />
                     <p className="text-slate-300 font-medium mb-1">No scan data available</p>
-                    <p className="text-slate-500 text-sm">Run Auto Scan or Add manually for {selectedDate} ({selectedTimeframe}).</p>
+                    <p className="text-slate-500 text-sm">Scan pairs from your watchlist for {selectedDate} ({selectedTimeframe}).</p>
                   </td>
                 </tr>
               ) : (
                 scanners.map((s) => (
-                  <tr key={s.id} className="hover:bg-slate-700/40 transition-colors group cursor-pointer" onClick={() => openDetailPanel(s)}>
+                  <tr key={s.id} className="hover:bg-slate-700/40 transition-colors group">
                     <td className="px-6 py-4">
                       <div className="flex items-center gap-3">
                         <div className="w-8 h-8 rounded-full bg-slate-900 border border-slate-700 flex items-center justify-center font-bold text-xs text-slate-300">
@@ -324,9 +375,41 @@ export default function ScannerPro() {
                       </div>
                     </td>
                     <td className="px-6 py-4 text-center">
-                      <button className="p-2 bg-slate-900 border border-slate-700 rounded-lg text-slate-400 group-hover:text-blue-400 group-hover:border-blue-500/30 transition-all">
-                        <Eye className="w-4 h-4" />
+                      <button 
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleScanPair(s.pair);
+                        }}
+                        disabled={isScanningPair(s.pair)}
+                        className="p-2 bg-slate-900 border border-slate-700 rounded-lg text-slate-400 hover:text-blue-400 hover:border-blue-500/30 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                        title="Re-scan this pair"
+                      >
+                        <RefreshCw className={`w-4 h-4 ${isScanningPair(s.pair) ? 'animate-spin text-blue-400' : ''}`} />
                       </button>
+                    </td>
+                    <td className="px-6 py-4">
+                      <div className="flex items-center justify-center gap-2">
+                        <button 
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            openDetailPanel(s);
+                          }}
+                          className="p-2 bg-slate-900 border border-slate-700 rounded-lg text-slate-400 group-hover:text-blue-400 group-hover:border-blue-500/30 transition-all"
+                          title="View details"
+                        >
+                          <Eye className="w-4 h-4" />
+                        </button>
+                        <button 
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setDeleteTargetId(String(s.id));
+                          }}
+                          className="p-2 bg-slate-900 border border-slate-700 rounded-lg text-slate-400 hover:text-red-400 hover:border-red-500/30 transition-all"
+                          title="Delete record"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))
@@ -561,6 +644,18 @@ export default function ScannerPro() {
           </motion.div>
         )}
       </AnimatePresence>
+
+      {/* Delete Confirmation Modal */}
+      <ConfirmModal
+        isOpen={deleteTargetId !== null}
+        onClose={() => setDeleteTargetId(null)}
+        onConfirm={handleDeleteScanner}
+        title="Hapus Scanner Record"
+        message="Record scanner ini akan dihapus permanen. Lanjutkan?"
+        confirmText="Hapus"
+        cancelText="Batal"
+        variant="danger"
+      />
     </motion.div>
   );
 }

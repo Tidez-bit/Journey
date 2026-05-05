@@ -49,9 +49,6 @@ services:
     restart: unless-stopped
     ports:
       - "5173:5173"
-    environment:
-      VITE_API_URL: "http://localhost:5000"
-      VITE_WS_URL: "ws://localhost:5000"
     depends_on:
       - server
 

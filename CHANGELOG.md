@@ -106,6 +106,67 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Screenshots stored locally on server
 
 ### Fixed
+
+- **[BUG] Scanner Delete Modal Type Mismatch** (2026-05-05)
+  - **Problem**: Delete modal never appeared when clicking Trash2 button
+  - **Root Cause**: Type mismatch - `deleteTargetId` was `number | null` but Prisma returns Int as string in JSON
+  - **Fix**: Changed type to `string | null` and added explicit `String()` conversion
+  
+  **Files Modified**:
+  - `client/src/pages/ScannerPro.tsx` - Changed state type and added String() conversion
+  
+  **Impact**:
+  - Before: Delete button clicked → No modal appears
+  - After: Delete button clicked → ConfirmModal appears correctly
+  - TypeScript strict mode now satisfied
+
+- **[IMPROVEMENT] Scanner Backend Validation** (2026-05-05)
+  - **analyzePair Function**:
+    - Added `binancePair` variable for documentation
+    - Enhanced error logging with both pair formats (slash and no-slash)
+    - Added price validation to catch $0.00 issues early
+    - Better error messages showing which pair failed
+  
+  - **deleteScanner Function**:
+    - Added NaN validation after parseInt
+    - Returns 400 error for invalid ID format
+    - Cleaner code with single ID parse
+  
+  **Files Modified**:
+  - `server/controllers/scannerController.js` - Enhanced error handling and validation
+  
+  **Impact**:
+  - Before: Poor error messages, potential NaN errors
+  - After: Clear error messages, robust validation, better debugging
+
+- **[BUG] Scanner Delete & Multi-Pair Scan** (2026-05-05)
+  - **Problem 1 - No Delete Functionality:**
+    - Added DELETE endpoint: `DELETE /api/scanner/:id`
+    - Added delete button (Trash2 icon) in scanner table Actions column
+    - Implemented ConfirmModal for delete confirmation
+    - Backend verifies user ownership before deletion
+  
+  - **Problem 2 - Single-Pair Scan Limitation:**
+    - Changed scanning state from boolean to per-pair: `Record<string, boolean>`
+    - Removed old `handleAutoScan` that only scanned first pair
+    - Added `handleScanPair(pair)` for individual pair scanning
+    - Added per-pair scan buttons in table Scan column
+    - Added Quick Scan Watchlist section with all pairs
+    - Multiple pairs can now scan simultaneously
+  
+  **Files Modified:**
+  - Backend:
+    - `server/controllers/scannerController.js` - Added `deleteScanner` function
+    - `server/routes/scannerRoutes.js` - Added DELETE route
+  - Frontend:
+    - `client/src/pages/ScannerPro.tsx` - Complete overhaul with multi-pair state + delete UI
+  
+  **Impact:**
+  - Before: No delete button, only 1 pair could scan at a time
+  - After: Delete with confirmation, parallel scanning of multiple pairs
+  - UX: Quick Scan section for easy watchlist scanning
+  - Performance: Independent per-pair loading states
+
 - **[CRITICAL] Prisma Singleton Pattern Implementation** (2026-05-05)
   - Fixed multiple PrismaClient instances being created across controllers
   - Implemented proper singleton pattern to prevent "too many connections" errors
